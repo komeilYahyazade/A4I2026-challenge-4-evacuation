@@ -9,7 +9,8 @@
 --                       coastal flooding (FEMA NRI), inside the cone
 --   COASTAL_FLOOD_TRACT same exposure test with no cone: advisory = 'ANY',  (APPROXIMATE)
 --                       the cone-agnostic list for an August drill
--- The 50% cut is a data-lane hazard decision: "most of the neighbourhood floods". The FEMA surge
+-- The 50% cut (SITE_FLOOD_SHARE_HIGH in agent/reachability.py, substituted by build_views.sh) is a
+-- data-lane hazard decision: "most of the neighbourhood floods". The FEMA surge
 -- flag alone cannot carry this, because it is blank for 81 of Lee's 84 pre-landfall shelters.
 --
 -- down_rank is deterministic: FEMA surge flag first, then flood frequency, exposed share,
@@ -25,7 +26,7 @@ WITH region AS (
   JOIN `${PROJECT}.${OPS}.v_shelter_site_hazard` AS h USING (shelter_id)
   WHERE e.is_pre_landfall
     AND e.county_fips IN ('12071', '12015', '12021', '12043', '12051')
-    AND (e.surge_status = 'YES' OR h.coastal_flood_exposed_share >= 0.5)
+    AND (e.surge_status = 'YES' OR h.coastal_flood_exposed_share >= ${FLOOD_SHARE})
 ),
 advisories AS (
   SELECT storm_id, advisory, issued_at, hours_before_landfall, cone FROM `${PROJECT}.${OPS}.storm_advisories`
