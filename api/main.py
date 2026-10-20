@@ -21,7 +21,8 @@ from api.routes import router  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 
-app = get_fast_api_app(agents_dir=str(AGENTS_DIR), web=True, allow_origins=["*"])
+# In-memory sessions only: session events can carry Google Maps content, which may not be stored.
+app = get_fast_api_app(agents_dir=str(AGENTS_DIR), web=True, allow_origins=["*"], use_local_storage=False)
 app.include_router(router)
 errors.install(app)
 
