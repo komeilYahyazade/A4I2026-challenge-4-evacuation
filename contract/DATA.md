@@ -11,8 +11,11 @@ Rebuild: `bash scripts/build_views.sh`, which runs `sql/*.sql` in order. Views u
 ops tables use CREATE IF NOT EXISTS, so they are never truncated. The Ian replay is loaded with `bash sql/ian/load_ian.sh`.
 
 **There is one source of thresholds.** `build_views.sh` reads `WALK_KM`, `PARATRANSIT_PROXY_KM`, `CAR_KM`,
-`CAPACITY_PLAUSIBLE_MAX` and `PRE_LANDFALL_USAGE` from `agent/reachability.py` at build time. Change them
-there and re-run the script. The views never define their own.
+`CAPACITY_PLAUSIBLE_MAX`, `SITE_FLOOD_SHARE_HIGH` and `PRE_LANDFALL_USAGE` from `agent/reachability.py` at
+build time. Change them there and re-run the script. The views never define their own, and
+`sql/audit/equity_audit.sql` reads `PARATRANSIT_PROXY_KM` the same way (see its header).
+The one deliberate literal is the Ian replay's county list in `v_ian_shelters_down` (Lee and the four
+counties touching it): that view is a Lee tabletop scenario, not a statewide rule.
 
 Three rules hold in every view:
 - Flags are `'YES' | 'NO' | 'UNRECORDED'`. NULL or blank becomes UNRECORDED, never NO.
@@ -30,11 +33,11 @@ care_facilities **694**, power_dependent_counties **67**.
 | Column | Type | Notes |
 |---|---|---|
 | shelter_id | INT64 | Unique (2,793 distinct). CAST to STRING on the wire |
-| shelter_name, address_1, city, zip | STRING | 146 names say "INACTIVE …" (see `name_says_inactive`) |
+| shelter_name, address_1, city, zip | STRING | 148 names contain INACTIVE, CLOSED, DEMOLISHED or DO NOT USE (see `name_says_inactive`). 25 name+address groups appear more than once (see `is_duplicate_record`) |
 | county_parish, state | STRING | FEMA text; use `county_fips` instead |
 | county_fips, county_name | STRING | **Derived** by the notebook from coordinates (point-in-polygon). Present for all 2,793 rows, all in FL |
 | latitude, longitude | FLOAT64 | No nulls, all in range |
-| evacuation_capacity, post_impact_capacity | FLOAT64 | NULL for 529 rows, 0 for 731. POST shelters legitimately have evac = 0 (620 of 622 carry a post-impact capacity). On EVAC/BOTH, NULL or 0 means **unrecorded** (188 NULL + 109 zero). Max 5,750: FL has no capacity above 100k |
+| evacuation_capacity, post_impact_capacity | FLOAT64 | NULL for 529 rows, 0 for 731. POST shelters legitimately have evac = 0 (620 of 622 carry a post-impact capacity). On EVAC/BOTH, NULL or 0 means **unrecorded** (188 NULL + 109 zero). Max 5,750: FL has no capacity above 100k. A negative value (FEMA files -1 in some states) is **unrecorded** too, never a number of spaces |
 | wheelchair_accessible, generator_onsite, self_sufficient_electricity, in_surge_slosh_area, in_100_yr_floodplain | BOOL | Parsed from FEMA's YES/NO strings, with blank or UNK turned into NULL. Wheelchair: 247 TRUE / 83 FALSE / **2,463 NULL (88%)**. Generator: 2,318 NULL. Surge: 2,269 NULL. Floodplain: 2,323 NULL |
 | usage | STRING | `EVAC` 1,391 · `POST` 698 · `BOTH` 372 · **NULL 332**. Pre-landfall means EVAC or BOTH |
 | population_code, is_medical, is_functional | STRING/BOOL | is_medical is never NULL (155 TRUE) |
@@ -88,13 +91,15 @@ This view has the same columns and meaning as `agent/queries.py SHELTER_COLUMNS`
 | is_pre_landfall | BOOL | usage is in PRE_LANDFALL_USAGE. FALSE when usage is unrecorded |
 | pre_landfall_status | STRING | YES / NO / UNRECORDED |
 | evacuation_capacity, post_impact_capacity | FLOAT64 | The raw FEMA values |
-| capacity | INT64 | The usable evacuation capacity. **NULL** when FEMA's value is NULL, or 0 on a shelter that is pre-landfall or has unrecorded usage |
+| capacity | INT64 | The usable evacuation capacity. **NULL** when FEMA's value is NULL or negative, or 0 on a shelter that is pre-landfall or has unrecorded usage |
 | capacity_status | STRING | `RECORDED` / `UNRECORDED` |
 | capacity_implausible | BOOL | evacuation_capacity > CAPACITY_PLAUSIBLE_MAX. Never TRUE in FL |
 | wheelchair_status, generator_status, surge_status, floodplain_status | STRING | YES / NO / UNRECORDED |
 | is_medical | BOOL | |
 | pet_accommodations_code | STRING | |
 | name_says_inactive | BOOL | The FEMA name contains INACTIVE, CLOSED, DEMOLISHED or DO NOT USE. **148 FL rows, 24 still EVAC/BOTH** (6,876 spaces). This is the same expression as `queries.py`. The row is flagged, never dropped; Google Maps is what checks it |
+| duplicate_group_size | INT64 | How many rows share this shelter's name and address (TRIM, UPPER). 1 for almost every row |
+| is_duplicate_record | BOOL | TRUE for every row in a duplicate group except the lowest shelter_id. **Flagged, not removed**: the brief and the other views still count these rows, so a duplicate can be counted twice in a total. `v_county_shelter_summary.duplicate_records` says how many per county |
 
 ### `v_tract_need`: one row per populated tract, statewide (filter on `county_fips`)
 | Column | Type | Meaning |
@@ -104,7 +109,7 @@ This view has the same columns and meaning as `agent/queries.py SHELTER_COLUMNS`
 | total_pop, households, households_no_vehicle, group_quarters_pop | FLOAT64 | ACS, RECORDED |
 | share_no_vehicle | FLOAT64 | households_no_vehicle / households |
 | persons_per_household | FLOAT64 | (total_pop − group_quarters_pop) / households. NULL when households = 0 |
-| est_persons_no_vehicle | FLOAT64 | households_no_vehicle × persons_per_household. **This is the allocator's demand.** It is an estimate, labelled as such |
+| est_persons_no_vehicle | FLOAT64 | households_no_vehicle × persons_per_household. **This is the allocator's demand.** It is an estimate, labelled as such. It uses the tract's *average* household size, and households without a car tend to be smaller (older people living alone), so it most likely **overstates** the people. It is NULL for tracts with residents but no households (group quarters only: dorms, prisons, nursing homes), so those residents are not in it. Nursing homes are covered by `care_facilities` |
 | pop_65_plus, mobile_homes | FLOAT64 | ACS |
 | pct_age_65_plus, pct_disability, pct_mobile_homes, pct_no_vehicle_svi | FLOAT64 | CDC SVI, RECORDED. Negative sentinels become NULL |
 | pct_mobility | FLOAT64 | CDC PLACES, **MODELED** |
@@ -128,6 +133,12 @@ neighbourhood, not the building's elevation."** This is the stand-in for the FEM
 | coastal_flood_exposed_pop, coastal_flood_annual_frequency | FLOAT64 | CFLD_EXPP, CFLD_AFREQ |
 | coastal_flood_exposed_share | FLOAT64 | CFLD_EXPP / POPULATION, from 0 to 1. **Use this one** |
 | site_coastal_flood_status | STRING | YES (CFLD_EXPP > 0) / NO / UNRECORDED. Too coarse to act on: it is YES for 71 of Lee's 84 |
+
+**NULL exposure and the 50% test.** `coastal_flood_exposed_share` is NULL when the nearest tract has no NRI
+coastal-flood figure (330 tracts statewide, inland ones where FEMA computed none). The `SITE_FLOOD_SHARE_HIGH`
+test in the brief and in `v_ian_shelters_down` treats NULL as **not flagged**, which is right for inland
+tracts but is a choice, not a fact: `site_coastal_flood_status` still says UNRECORDED for those shelters, and
+"not flagged" must never be read as "safe from flooding".
 | method | STRING | `nearest 2020 tract centroid by ST_DISTANCE (approximate)` |
 
 ### `v_tract_shelter_candidates`: the allocator's edge list
@@ -157,9 +168,19 @@ Lee: 3,315 edges, 221 tracts, 112 shelters (28 outside Lee), 432 edges to shelte
 
 ### `v_county_shelter_summary`: registry record quality per county
 shelters, pre_landfall, post_only, usage_unrecorded, pre_landfall_capacity_recorded/unrecorded,
-pre_landfall_capacity_plausible (recorded and plausible capacity only), capacity_implausible, and
-pre_landfall_{wheelchair,generator,surge}_{yes,no,unrecorded}, plus pre_landfall_site_coastal_flood_exposed, medical_needs and
-medical_needs_generator_yes. All are INT64. **These count paperwork, not buildings. Never rank counties on them.**
+pre_landfall_capacity_plausible, pre_landfall_name_says_inactive, pre_landfall_name_says_inactive_spaces,
+capacity_implausible, duplicate_records, pre_landfall_duplicate_records,
+pre_landfall_{wheelchair,generator,surge}_{yes,no,unrecorded}, pre_landfall_site_coastal_flood_exposed, medical_needs,
+medical_needs_generator_yes, pre_landfall_medical_needs and pre_landfall_medical_needs_generator_yes. All are INT64.
+**These count paperwork, not buildings. Never rank counties on them.**
+
+- **Capacity matches the brief** (`agent/brief.py _shelter_summary`, and the Toolbox's `county_record_quality`):
+  `pre_landfall_capacity_recorded`, `_unrecorded` and `_plausible` leave out shelters whose own FEMA name says
+  inactive, and `_plausible` also leaves out implausible capacities. The inactive ones are counted separately.
+- **`medical_needs` counts every usage code**, POST included, because the brief's generator-gap fix does. Quote
+  `pre_landfall_medical_needs` when the question is where people can go before landfall.
+- **Duplicates are counted, not removed.** Totals still include `is_duplicate_record` rows; check
+  `pre_landfall_duplicate_records` for a county before quoting its capacity.
 
 ### Ian replay (rehearsal only, never with Google Maps)
 **`storm_advisories`**: one row per NHC advisory for AL092022: advisories 9, 11, 13, 17 and 19, which are 82.1, 70.1, 58.1, 34.1 and

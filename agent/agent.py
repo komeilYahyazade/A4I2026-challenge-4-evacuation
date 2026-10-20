@@ -139,11 +139,21 @@ def instruction_for(cfg: AgentConfig) -> str:
     """The system instruction plus where the data lives, so the BigQuery tools are not guessing."""
     if not cfg.project_id:
         return SYSTEM_INSTRUCTION
+    ops = f"{cfg.project_id}.{cfg.ops_dataset}"
     return SYSTEM_INSTRUCTION + (
-        f"\nWHERE THE DATA LIVES\n- BigQuery project: {cfg.project_id}. Source tables are in dataset "
-        f"{cfg.dataset}; views and operational tables are in {cfg.ops_dataset}. Use this project id "
-        f"for every bigquery tool call, and write fully qualified names like "
-        f"`{cfg.project_id}.{cfg.dataset}.shelters` in SQL.\n"
+        f"\nWHERE THE DATA LIVES\n- BigQuery project: {cfg.project_id}. Use this project id for every "
+        f"bigquery tool call, and write fully qualified names in SQL.\n"
+        f"- Query the views in {cfg.ops_dataset}, never the raw source tables, for shelters and tracts. "
+        f"They already apply the rules in this instruction: flags as YES, NO or UNRECORDED, blank or "
+        f"negative capacity as unrecorded, and FEMA names that say INACTIVE. "
+        f"Shelters: `{ops}.v_shelter_evidence`, one row per shelter. "
+        f"Per-county shelter counts: `{ops}.v_county_shelter_summary`. "
+        f"Tracts: `{ops}.v_tract_need`. "
+        f"Tract to nearest pre-landfall shelters: `{ops}.v_tract_shelter_candidates`. "
+        f"Shelter flood exposure, approximate: `{ops}.v_shelter_site_hazard`.\n"
+        f"- The raw source tables in {cfg.dataset} are only for what no view carries: care_facilities, "
+        f"power_dependent_counties and hazard_tracts. Their boolean flags are NULL when nobody recorded "
+        f"them; count NULL as unrecorded, never as no.\n"
         f"- Default county: FIPS {cfg.default_county_fips}. When the manager says my county, my shelters, "
         f"here, or names no county, use this one without asking.\n"
     )

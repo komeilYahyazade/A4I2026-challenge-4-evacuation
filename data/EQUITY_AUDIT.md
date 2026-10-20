@@ -67,10 +67,19 @@ To reproduce with the data lane's query, pass any list's top 15 tract ids:
 
 ```bash
 P=qwiklabs-gcp-03-7a0c015d2e8a
-sed "s/\${PROJECT}/$P/g" sql/audit/equity_audit.sql | bq --project_id=$P query --use_legacy_sql=false \
+KM=$(grep -E '^PARATRANSIT_PROXY_KM *=' agent/reachability.py | tail -1 | sed -E 's/^[^=]*= *//')
+sed -e "s/\${PROJECT}/$P/g" -e "s/\${OPS}/readiness_ops/g" -e "s/\${PROXY_KM}/$KM/g" sql/audit/equity_audit.sql \
+  | bq --project_id=$P query --use_legacy_sql=false \
   --parameter='geo_ids:ARRAY<STRING>:["<id1>","<id2>",...]' \
   --parameter='county_fips:STRING:12071' --parameter='label:STRING:after'
 ```
+
+The "nearby" radius for the reporting-bias column is `PARATRANSIT_PROXY_KM` (15 km today), read from
+`agent/reachability.py` so the audit and the agent cannot drift apart.
+
+Check `tracts_requested` against `tracts_matched` on every row before quoting any share. A join that
+dropped tract ids (a 2010-vintage id, a lost leading zero) looks exactly like "no data here", and only the
+two counts side by side tell them apart.
 
 If the "can't drive" list's top 15 is exactly the top 15 by `households_no_vehicle`, the after row equals
 cohort B.
