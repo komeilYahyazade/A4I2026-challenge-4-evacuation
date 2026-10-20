@@ -1,0 +1,15 @@
+# Source uploaded by `gcloud run deploy --source .`
+.git/
+.gitignore
+.venv/
+.env
+.adk/
+**/.adk/
+__pycache__/
+*.pyc
+.docx/
+notebooks/
+tests/
+frontend/
+data/
+scripts/
