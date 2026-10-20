@@ -31,6 +31,12 @@ def test_instruction_names_the_bigquery_project_and_datasets():
         assert "{" not in agent.instruction and "}" not in agent.instruction
 
 
+def test_instruction_names_the_default_county_for_unscoped_questions():
+    # The console's suggestions ("Which of my shelters...") name no county.
+    agent = build_root_agent(AgentConfig(project_id="demo-project", default_county_fips="12071"))
+    assert "12071" in agent.instruction
+
+
 def test_instruction_without_a_project_is_the_base_instruction():
     assert build_root_agent(AgentConfig()).instruction == SYSTEM_INSTRUCTION
 

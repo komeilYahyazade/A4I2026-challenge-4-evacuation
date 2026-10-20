@@ -1163,6 +1163,43 @@ code {
   }
 }
 
+/* Narrow screens: one column, page scrolls, nothing overflows sideways. */
+@media (max-width: 760px) {
+  .app {
+    height: auto;
+    min-height: 100vh;
+  }
+  .topbar {
+    flex-wrap: wrap;
+  }
+  .beats {
+    margin-left: 0;
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+  .status {
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    white-space: normal;
+  }
+  .layout {
+    grid-template-columns: 1fr;
+  }
+  .timeline {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    max-height: 240px;
+  }
+  .map-wrap {
+    height: 60vh;
+  }
+  .panel {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+}
+
 .drop-callout {
   margin: 6px 0 2px;
   background: #212121;

@@ -144,6 +144,8 @@ def instruction_for(cfg: AgentConfig) -> str:
         f"{cfg.dataset}; views and operational tables are in {cfg.ops_dataset}. Use this project id "
         f"for every bigquery tool call, and write fully qualified names like "
         f"`{cfg.project_id}.{cfg.dataset}.shelters` in SQL.\n"
+        f"- Default county: FIPS {cfg.default_county_fips}. When the manager says my county, my shelters, "
+        f"here, or names no county, use this one without asking.\n"
     )
 
 
