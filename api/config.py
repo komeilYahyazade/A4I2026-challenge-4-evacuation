@@ -14,12 +14,12 @@ BQ_LOCATION = os.environ.get("BQ_LOCATION", "US")
 STATE = os.environ.get("STATE", "FL")
 MODEL = os.environ.get("MODEL", "gemini-3.6-flash")
 MAX_PARALLEL_VERIFY = int(os.environ.get("MAX_PARALLEL_VERIFY", "6"))
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 
 MOCK_MODE = os.environ.get("MOCK_MODE", "1") == "1"
 LIVE_ROUTES = {r.strip() for r in os.environ.get("LIVE_ROUTES", "").split(",") if r.strip()}
 
-ROUTES = ("counties", "map", "insights", "shelter", "verify", "briefs", "audit", "chat")
+ROUTES = ("counties", "map", "insights", "plan", "shelter", "verify", "briefs", "audit", "chat")
 
 
 def is_live(route: str) -> bool:

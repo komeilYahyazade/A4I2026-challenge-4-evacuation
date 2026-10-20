@@ -10,9 +10,14 @@ load_dotenv(REPO_ROOT / ".env")
 
 PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
 DATASET = os.environ.get("BQ_DATASET", "evacuation_readiness")
+# The data lane's ops dataset: Hurricane Ian NHC advisories (cones, track). Read only here.
+OPS_DATASET = os.environ.get("OPS_DATASET", "readiness_ops")
 BQ_LOCATION = os.environ.get("BQ_LOCATION", "US")
 STATE = os.environ.get("STATE", "FL")
 MODEL = os.environ.get("MODEL", "gemini-3.6-flash")
+# Gemini Live is regional; text and Maps grounding stay at GOOGLE_CLOUD_LOCATION (global).
+VOICE_MODEL = os.environ.get("VOICE_MODEL", "gemini-3.8-live")
+VOICE_LOCATION = os.environ.get("VOICE_LOCATION", "us-central1")
 MAX_PARALLEL_VERIFY = int(os.environ.get("MAX_PARALLEL_VERIFY", "6"))
 SQL_DIR = Path(os.environ.get("SQL_DIR", REPO_ROOT / "sql"))
 

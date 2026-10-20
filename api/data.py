@@ -10,7 +10,7 @@ from collections.abc import Callable
 from api import config
 from api.errors import ApiError
 from contract import schemas
-from readiness_agent import shapes
+from readiness_agent import plan, shapes
 from readiness_agent.tools import bq
 from readiness_agent.tools import verify as verify_tool
 
@@ -138,3 +138,20 @@ def insights(county_fips: str, reachable_km: float) -> dict:
         "freshness": "historical",
         "sources": ["fema_nss", "acs", "cdc_svi", "cdc_places", "fema_nri", "cms", "hhs_empower"],
     }
+
+
+def allocation(county_fips: str, max_km: float) -> dict:
+    county_name(county_fips)
+    return _cached(f"alloc:{county_fips}:{max_km}", lambda: plan.allocation(county_fips, max_km))
+
+
+def rehearsal(county_fips: str, advisory: str) -> dict:
+    county_name(county_fips)
+    advisories = {a["advisory"] for a in storm()["advisories"]}
+    if advisory not in advisories:
+        raise ApiError(404, "advisory_not_found", f"No Ian advisory {advisory}; have {sorted(advisories, key=int)}")
+    return _cached(f"rehearsal:{county_fips}:{advisory}", lambda: plan.rehearse(county_fips, advisory))
+
+
+def storm() -> dict:
+    return _cached("storm:ian_2022", plan.storm_track)

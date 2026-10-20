@@ -52,6 +52,36 @@ def county_insights(county_fips: str, reachable_km: float = 3.0):
     return data.insights(county_fips, round(reachable_km, 1))
 
 
+@router.get("/counties/{county_fips}/allocation", response_model=schemas.Allocation)
+def county_allocation(county_fips: str, max_km: float = 15.0):
+    """Who goes where within recorded capacity (OR-Tools min-cost flow, straight line, no Maps)."""
+    _check_fips(county_fips)
+    if not 1 <= max_km <= 40:
+        raise ApiError(400, "invalid_max_km", "max_km must be between 1 and 40")
+    if not config.is_live("plan"):
+        return mocks.mock("allocation.json")
+    from api import data
+    return data.allocation(county_fips, round(max_km, 1))
+
+
+@router.get("/counties/{county_fips}/rehearsal", response_model=schemas.Rehearsal)
+def county_rehearsal(county_fips: str, advisory: str = "19"):
+    """Hurricane Ian tabletop replay at one NHC advisory: shelters offline, re-solve, diff. No Maps."""
+    _check_fips(county_fips)
+    if not config.is_live("plan"):
+        return mocks.mock("rehearsal.json")
+    from api import data
+    return data.rehearsal(county_fips, advisory)
+
+
+@router.get("/storms/ian_2022", response_model=schemas.StormTrack)
+def storm_ian():
+    if not config.is_live("plan"):
+        return mocks.mock("storm.json")
+    from api import data
+    return data.storm()
+
+
 @router.get("/shelters/{shelter_id}", response_model=schemas.ShelterDetail)
 def shelter(shelter_id: str):
     if not config.is_live("shelter"):

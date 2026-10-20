@@ -1,0 +1,94 @@
+{
+ "county_fips": "12071",
+ "scenario": {
+  "id": "ian_2022",
+  "name": "Hurricane Ian (2022) tabletop replay",
+  "storm_id": "AL092022",
+  "landfall_at": "2022-09-28T19:05:00Z",
+  "source": "illustrative mock",
+  "advisory": "19",
+  "issued_at": "2022-09-27T21:00:00Z",
+  "hours_before_landfall": 22.1
+ },
+ "at_risk_total": 2,
+ "shelters_down": [
+  {
+   "shelter_id": "S1",
+   "name": "Example Elementary",
+   "lat": 26.62,
+   "lon": -81.86,
+   "reason": "IN_CONE_AND_FLOOD_EXPOSED",
+   "in_plan": true,
+   "capacity": 600,
+   "evidence": "APPROXIMATE: inside the cone, and 60% of the nearest tract's residents are coastal-flood exposed (FEMA NRI)"
+  }
+ ],
+ "at_risk_not_in_plan": [
+  {
+   "shelter_id": "S3",
+   "name": "Example Church",
+   "lat": 26.7,
+   "lon": -81.9,
+   "reason": "IN_SURGE_ZONE",
+   "in_plan": false,
+   "capacity": null,
+   "evidence": "RECORDED: FEMA in_surge_slosh_area = yes"
+  }
+ ],
+ "before": {
+  "demand_persons": 1400,
+  "assigned_persons": 900,
+  "unassigned_persons": 500,
+  "usable_capacity": 900,
+  "shelters_used": 2
+ },
+ "after": {
+  "demand_persons": 1400,
+  "assigned_persons": 300,
+  "unassigned_persons": 1100,
+  "usable_capacity": 300,
+  "shelters_used": 1
+ },
+ "capacity_lost": 600,
+ "reassigned": [],
+ "reassigned_total": 0,
+ "newly_unassigned": [
+  {
+   "geo_id": "12071000100",
+   "persons": 600,
+   "lat": 26.6,
+   "lon": -81.85,
+   "reason": "CAPACITY_EXHAUSTED"
+  }
+ ],
+ "cone": {
+  "type": "Polygon",
+  "coordinates": [
+   [
+    [
+     -82.6,
+     26.2
+    ],
+    [
+     -81.2,
+     26.2
+    ],
+    [
+     -81.2,
+     27.4
+    ],
+    [
+     -82.6,
+     27.4
+    ],
+    [
+     -82.6,
+     26.2
+    ]
+   ]
+  ]
+ },
+ "maps_used": false,
+ "note": "Tabletop rehearsal: no Google Maps grounding is used.",
+ "freshness": "historical"
+}

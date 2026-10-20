@@ -30,6 +30,7 @@ FixCategory = Literal[
     "shelter_in_surge_zone",
     "record_mismatch",
     "medical_needs_gap",
+    "seat_gap",  # additive v0.3: people the capacity plan leaves without a seat within reach
 ]
 Track = Literal["shelter_readiness", "getting_people_out", "medically_dependent"]
 Step = Literal["rank_tracts", "find_shelters", "verify_shelters", "find_gaps", "write_brief", "complete"]
@@ -292,6 +293,166 @@ class CountyInsights(_Model):
     power: PowerSummary
     freshness: Literal["historical"] = "historical"
     sources: list[SourceKind]
+
+
+# ---- routes: allocation, Ian rehearsal, storm track (additive, v0.3) ----------------------------
+# Never Google Maps: the allocator also runs in the rehearsal, where grounding is not used.
+
+
+class AllocTotals(_Model):
+    demand_persons: int
+    assigned_persons: int
+    unassigned_persons: int
+    usable_capacity: int
+    shelters_used: int
+
+
+class AllocTract(_Model):
+    geo_id: str
+    lat: float | None
+    lon: float | None
+    households_no_vehicle: int
+    persons_per_household: float | None
+    demand_persons: int
+    assigned_persons: int
+    unassigned_persons: int
+
+
+class AllocShelter(_Model):
+    shelter_id: str
+    name: str
+    lat: float | None
+    lon: float | None
+    county_fips: str | None
+    capacity: int | None
+    capacity_implausible: bool
+    wheelchair_accessible: Flag
+    generator_onsite: Flag
+    in_surge_slosh_area: Flag
+    is_medical: bool
+    excluded_reason: Literal["DOWN", "NAME_SAYS_INACTIVE", "DUPLICATE_RECORD", "CAPACITY_UNRECORDED",
+                             "CAPACITY_IMPLAUSIBLE"] | None
+    assigned_persons: int
+    utilization: float | None
+
+
+class Assignment(_Model):
+    geo_id: str
+    shelter_id: str
+    persons: int
+    straight_line_km: float
+    mode: Literal["WALK", "PARATRANSIT"]
+
+
+class Unplaced(_Model):
+    geo_id: str
+    persons: int
+    lat: float | None
+    lon: float | None
+    reason: Literal["CAPACITY_EXHAUSTED", "NO_SHELTER_WITHIN_MAX_KM"]
+
+
+class SiteOption(_Model):
+    geo_id: str
+    lat: float | None
+    lon: float | None
+    persons_covered: int
+    tracts_covered: list[str]
+
+
+class Allocation(_Model):
+    county_fips: str
+    status: Literal["OPTIMAL", "NO_DEMAND", "SOLVER_ERROR"]
+    max_km: float
+    shelter_seeking_share: float
+    totals: AllocTotals
+    tracts: list[AllocTract]
+    shelters: list[AllocShelter]
+    assignments: list[Assignment]
+    unassigned: list[Unplaced]
+    site_options: list[SiteOption]
+    excluded_counts: dict[str, int]
+    rules: dict[str, str]
+    maps_used: Literal[False] = False
+    freshness: Literal["historical"] = "historical"
+
+
+class DownShelter(_Model):
+    shelter_id: str
+    name: str
+    lat: float | None
+    lon: float | None
+    reason: Literal["IN_SURGE_ZONE", "IN_CONE_AND_FLOOD_EXPOSED"]
+    in_plan: bool
+    capacity: int | None
+    evidence: str
+
+
+class Reassignment(_Model):
+    geo_id: str
+    from_shelter_id: str
+    to_shelter_id: str
+    persons: int
+    tract_lat: float | None
+    tract_lon: float | None
+    to_lat: float | None
+    to_lon: float | None
+    from_lat: float | None
+    from_lon: float | None
+
+
+class Scenario(_Model):
+    id: str
+    name: str
+    storm_id: str
+    landfall_at: str
+    source: str
+    advisory: str
+    issued_at: str | None
+    hours_before_landfall: float | None
+
+
+class Rehearsal(_Model):
+    county_fips: str
+    scenario: Scenario
+    at_risk_total: int
+    shelters_down: list[DownShelter]
+    at_risk_not_in_plan: list[DownShelter]
+    before: AllocTotals
+    after: AllocTotals
+    capacity_lost: int
+    reassigned: list[Reassignment]
+    reassigned_total: int
+    newly_unassigned: list[Unplaced]
+    cone: dict | None  # GeoJSON polygon, NOAA NHC (public domain)
+    maps_used: Literal[False] = False
+    note: str
+    freshness: Literal["historical"] = "historical"
+
+
+class TrackPoint(_Model):
+    lat: float
+    lon: float
+    valid_at: str | None = None
+    wind_kt: int | None = None
+
+
+class StormAdvisory(_Model):
+    advisory: str
+    issued_at: str | None
+    hours_before_landfall: float | None
+    cone: dict | None
+    track: list[TrackPoint]
+
+
+class StormTrack(_Model):
+    storm_id: str
+    name: str
+    landfall_at: str
+    landfall: LatLon
+    source: str
+    advisories: list[StormAdvisory]
+    best_track: list[TrackPoint]
 
 
 # ---- routes: verify ---------------------------------------------------------------------------

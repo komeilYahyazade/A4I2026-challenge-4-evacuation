@@ -1,0 +1,68 @@
+{
+ "storm_id": "AL092022",
+ "name": "Ian",
+ "landfall_at": "2022-09-28T19:05:00Z",
+ "landfall": {
+  "lat": 26.7,
+  "lon": -82.2
+ },
+ "source": "illustrative mock",
+ "advisories": [
+  {
+   "advisory": "19",
+   "issued_at": "2022-09-27T21:00:00Z",
+   "hours_before_landfall": 22.1,
+   "cone": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -82.6,
+       26.2
+      ],
+      [
+       -81.2,
+       26.2
+      ],
+      [
+       -81.2,
+       27.4
+      ],
+      [
+       -82.6,
+       27.4
+      ],
+      [
+       -82.6,
+       26.2
+      ]
+     ]
+    ]
+   },
+   "track": [
+    {
+     "lat": 25.0,
+     "lon": -82.9
+    },
+    {
+     "lat": 26.7,
+     "lon": -82.2
+    }
+   ]
+  }
+ ],
+ "best_track": [
+  {
+   "lat": 24.5,
+   "lon": -83.0,
+   "valid_at": "2022-09-27T12:00:00Z",
+   "wind_kt": 105
+  },
+  {
+   "lat": 26.7,
+   "lon": -82.2,
+   "valid_at": "2022-09-28T19:05:00Z",
+   "wind_kt": 130
+  }
+ ]
+}

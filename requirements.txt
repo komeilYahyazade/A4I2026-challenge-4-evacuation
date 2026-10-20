@@ -12,3 +12,4 @@ python-dotenv
 pytest
 pytest-asyncio
 aiohttp
+ortools==9.15.6755

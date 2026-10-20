@@ -20,6 +20,12 @@ PARAM_TYPES = {
     "geo_ids": "ARRAY<STRING>",
     "shelter_ids": "ARRAY<STRING>",
     "place_id": "STRING",
+    "max_km": "FLOAT64",
+    "advisory": "STRING",
+    "storm_id": "STRING",
+    "rank_by": "STRING",
+    "ccn": "STRING",
+    "require": "STRING",
 }
 
 _client: bigquery.Client | None = None
@@ -35,7 +41,9 @@ def client() -> bigquery.Client:
 
 
 def render(name: str) -> str:
-    return (config.SQL_DIR / name).read_text().replace("{{dataset}}", f"{config.PROJECT}.{config.DATASET}")
+    return ((config.SQL_DIR / name).read_text()
+            .replace("{{dataset}}", f"{config.PROJECT}.{config.DATASET}")
+            .replace("{{ops}}", f"{config.PROJECT}.{config.OPS_DATASET}"))
 
 
 def _param(name: str, value: Any):
