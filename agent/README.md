@@ -97,3 +97,22 @@ speak to, sixty-four nobody has assessed"* is more useful, more honest, and will
 
 See the README's "Six defects you will meet" for the data traps and Section 13 of the notebook for
 the constraints.
+
+## Running our agent
+
+`evac_agent/` is the scaffold: one Gemini 3.x agent holding our function tools (`tools.py`),
+Maps grounding with routing switched on, and BigQuery's managed MCP server.
+
+In Cloud Shell, from the repo root:
+
+```bash
+gcloud services enable aiplatform.googleapis.com bigquery.googleapis.com
+# The BigQuery MCP endpoint may also need enabling for the project; see the BigQuery MCP docs.
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r agent/requirements.txt
+cp agent/evac_agent/.env.example agent/evac_agent/.env   # then set GOOGLE_CLOUD_PROJECT
+cd agent && adk web
+```
+
+The data must already be loaded (notebook, or `bash scripts/load.sh FL`). Locally, run
+`gcloud auth application-default login` first.
