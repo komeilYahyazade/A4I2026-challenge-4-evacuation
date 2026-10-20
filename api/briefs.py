@@ -24,9 +24,11 @@ from api.errors import ApiError, from_exception
 from contract import schemas
 from readiness_agent import brief_plan, shapes
 from readiness_agent.agent import brief_pipeline
+from readiness_agent.tools import assessments as assess_mod
 from readiness_agent.tools import bq
 from readiness_agent.tools import facts as facts_mod
 from readiness_agent.tools import verify as verify_tool
+from readiness_agent.tools.gaps import compute_gaps
 
 log = logging.getLogger(__name__)
 
@@ -61,6 +63,8 @@ class Job:
     brief: dict | None = None
     error: dict | None = None
     facts: dict = field(default_factory=dict)
+    judgments: schemas.BriefJudgments | None = None  # kept so a refresh re-assembles without the LLM
+    req: schemas.BriefRequest | None = None
     audit: dict | None = None
     step_started: dict = field(default_factory=dict)
     task: asyncio.Task | None = None
@@ -146,7 +150,9 @@ async def _run(job: Job, req: schemas.BriefRequest) -> None:
         job.facts = facts_mod.collect(final.state)
         raw = final.state.get("judgments")
         judgments = schemas.BriefJudgments.model_validate(raw) if raw else None
-        brief = await asyncio.to_thread(assemble_brief, job.facts, judgments, req)
+        job.judgments, job.req = judgments, req
+        assessed = await asyncio.to_thread(assess_mod.latest_rows, None, req.county_fips)
+        brief = await asyncio.to_thread(assemble_brief, job.facts, judgments, req, assessed)
         job.brief = schemas.Brief.model_validate(brief).model_dump(mode="json")
         job.progress.update(step="complete", message="Done", done=job.progress["done"])
         job.status = "complete"
@@ -158,6 +164,19 @@ async def _run(job: Job, req: schemas.BriefRequest) -> None:
         err = from_exception(e)
         job.error = {"code": err.code, "message": err.message, "retryable": err.retryable}
         job.status = "failed"
+
+
+async def refresh(brief_id: str) -> dict:
+    """Re-assemble a finished brief with the latest field assessments, from the facts and writer
+    judgments it already has. No model call and no Maps call: about one BigQuery query."""
+    job = get_job(brief_id)
+    if job.req is None:
+        raise ApiError(409, "brief_not_refreshable", f"Brief {brief_id} predates refresh support")
+    assessed = await asyncio.to_thread(assess_mod.latest_rows, None, job.county_fips)
+    brief = await asyncio.to_thread(assemble_brief, job.facts, job.judgments, job.req, assessed)
+    job.brief = schemas.Brief.model_validate(brief).model_dump(mode="json")
+    job.audit = None  # recomputed on request
+    return status(brief_id)
 
 
 # ---- assembling the brief ---------------------------------------------------------------------
@@ -217,22 +236,28 @@ def _drivers(kind: str, row: dict) -> list[dict]:
             if row.get(m) is not None]
 
 
-def _default_verdict(v: dict, shelter: dict) -> str:
+def _default_verdict(v: dict, shelter: dict, assessment: dict | None = None) -> str:
     """The strictest reading of the evidence. holds_up needs Maps to confirm the same building
-    AND the federal record to say wheelchair yes with Maps not disagreeing, and no recorded flood
-    exposure. A Maps 'accessible entrance' alone fills a blank record but does not close it."""
+    AND wheelchair yes, and no recorded flood exposure. Wheelchair yes comes from the federal
+    record with Maps not disagreeing, or from a field assessment (the operator said a wheelchair
+    user can get in alone today). A Maps 'accessible entrance' alone fills a blank record but does
+    not close it. An operator saying no means do not rely on it for wheelchair users."""
     if v["status"] in DROPPED or shelter["in_surge_slosh_area"] == "yes":
         return "do_not_rely"
-    if (v["status"] == "confirmed" and shelter["wheelchair_accessible"] == "yes"
-            and v["wheelchair"]["agreement"] != "disagree" and shelter["in_100_yr_floodplain"] != "yes"):
+    field = (assessment or {}).get("wheelchair_unaccompanied")
+    if field == "no":
+        return "do_not_rely"
+    wheelchair_yes = field == "yes" or (shelter["wheelchair_accessible"] == "yes"
+                                        and v["wheelchair"]["agreement"] != "disagree")
+    if v["status"] == "confirmed" and wheelchair_yes and shelter["in_100_yr_floodplain"] != "yes":
         return "holds_up"
     return "verify_before_season"
 
 
-def _guard_verdict(verdict: str, v: dict, shelter: dict, sid: str) -> str:
+def _guard_verdict(verdict: str, v: dict, shelter: dict, sid: str, assessment: dict | None = None) -> str:
     """Maps evidence wins: a closed or missing building is never relied on, and holds_up is
     never more generous than the evidence rule. The writer may still be stricter."""
-    rule = _default_verdict(v, shelter)
+    rule = _default_verdict(v, shelter, assessment)
     forced = verdict
     if rule == "do_not_rely":
         forced = "do_not_rely"
@@ -243,7 +268,7 @@ def _guard_verdict(verdict: str, v: dict, shelter: dict, sid: str) -> str:
     return forced
 
 
-def _default_verdict_reason(v: dict, shelter: dict, src_ids: list[str]) -> list[dict]:
+def _default_verdict_reason(v: dict, shelter: dict, src_ids: list[str], assessed: bool = False) -> list[dict]:
     live = {"confirmed": "Google Maps confirms the building at this address.",
             "renamed": f"Google Maps lists this address as {v.get('maps_name')}; the record name is out of date.",
             "closed": "Google Maps lists it as permanently closed; dropped from the plan.",
@@ -253,9 +278,45 @@ def _default_verdict_reason(v: dict, shelter: dict, src_ids: list[str]) -> list[
     rec = shelter["wheelchair_accessible"]
     hist = {"yes": "The FEMA record says it is wheelchair accessible.",
             "no": "The FEMA record says it is not wheelchair accessible.",
-            "unrecorded": "FEMA never recorded wheelchair access, so confirm the entrance on site."}[rec]
+            "unrecorded": "FEMA never recorded wheelchair access." if assessed
+            else "FEMA never recorded wheelchair access, so confirm the entrance on site."}[rec]
     return [{"text": live, "source_ids": src_ids[:1], "freshness": "live"},
             {"text": hist, "source_ids": [], "freshness": "historical"}]
+
+
+FIELD_SAYS = {"yes": "a wheelchair user can get in unaccompanied today",
+              "no": "a wheelchair user cannot get in unaccompanied today",
+              "unclear": "it is unclear whether a wheelchair user can get in unaccompanied"}
+
+
+def _field_segment(a: dict) -> dict:
+    """What the operator said, in a segment of its own: freshness field, no Maps sources."""
+    day = str(a.get("assessed_at") or "")[:10]
+    who = a.get("assessor_role") or "the shelter operator"
+    text = f"Field assessment {day}: {who} says {FIELD_SAYS[a['wheelchair_unaccompanied']]}."
+    if a.get("notes"):
+        text += f' In their words: "{a["notes"]}"'
+    return {"text": text, "source_ids": [], "freshness": "field"}
+
+
+def _field_fix(sid: str, shelter: dict, a: dict, serves: list[str]) -> dict:
+    return {"priority": 0, "category": "field_assessment",
+            "title": f"{shelter['name']}: the operator says {FIELD_SAYS['no']}",
+            "recommendation": "Agree an unlocked, staffed accessible entrance with the operator before September, "
+                              "or plan a different accessible destination for the tracts it serves.",
+            "affected": {"tracts": sorted(serves), "shelters": [sid], "care_facilities": []}, "source_ids": []}
+
+
+def _with_field_answers(f: dict, assessed: dict[str, dict]) -> dict:
+    """A copy of the facts where each candidate shelter's wheelchair flag is what the plan should
+    act on: a definite field answer replaces the FEMA flag. Used only to recompute gaps; the brief
+    still shows FEMA's own flag as the historical record."""
+    f2 = copy.deepcopy(f)
+    for cand in f2.get("candidates", {}).values():
+        for s in cand.get("shelters", []):
+            s["wheelchair_accessible"] = assess_mod.effective_wheelchair(
+                s["wheelchair_accessible"], assessed.get(str(s["shelter_id"])))
+    return f2
 
 
 def _fallback_fix(g: dict, county: dict) -> dict:
@@ -296,19 +357,38 @@ def _fallback_fix(g: dict, county: dict) -> dict:
     return {"priority": 0, "category": cat, "title": title, "recommendation": rec, "affected": a, "source_ids": []}
 
 
-def _headline(p: dict) -> str:
+def _headline(p: dict, assessed: dict[str, dict] | None = None) -> str:
+    assessed = assessed or {}
     dests = p["destinations"]
     kept = [d for d in dests if d["verification"]["status"] not in DROPPED]
     dropped = len(dests) - len(kept)
-    wc_yes = sum(1 for d in kept if (d["row"] or {}).get("wheelchair_accessible") == "yes")
-    unrec = sum(1 for d in kept if (d["row"] or {}).get("wheelchair_accessible") == "unrecorded")
+
+    def wc(d):
+        return assess_mod.effective_wheelchair((d["row"] or {}).get("wheelchair_accessible", "unrecorded"),
+                                               assessed.get(d["shelter_id"]))
+    wc_yes = sum(1 for d in kept if wc(d) == "yes")
+    unrec = sum(1 for d in kept if wc(d) == "unrecorded")
+    by_phone = sum(1 for d in kept if (assessed.get(d["shelter_id"]) or {}).get("wheelchair_unaccompanied")
+                   in ("yes", "no"))
     n_tracts = sum(1 for w in p["who"] if w["kind"] == "tract")
     text = (f"Of {len(dests)} shelters checked on Google Maps for the {n_tracts} least mobile tracts, "
+            f"{wc_yes} are wheelchair accessible by the record or the operator and {unrec} nobody has assessed"
+            if by_phone else
+            f"Of {len(dests)} shelters checked on Google Maps for the {n_tracts} least mobile tracts, "
             f"{wc_yes} are recorded as wheelchair accessible and {unrec} nobody has assessed")
+    if by_phone:
+        text += f"; {by_phone} answered by the operator by phone"
     return text + (f"; {dropped} dropped as closed or missing." if dropped else ".")
 
 
-def assemble_brief(f: dict, j: schemas.BriefJudgments | None, req: schemas.BriefRequest) -> dict:
+def assemble_brief(f: dict, j: schemas.BriefJudgments | None, req: schemas.BriefRequest,
+                   assessed_rows: list[dict] | None = None) -> dict:
+    """Join facts (numbers) with the writer's judgments (words). assessed_rows are the latest field
+    assessments for the county (sql/15_latest_assessments.sql); with none, the brief is exactly the
+    facts-plus-writer brief. With some, the shelters they cover get rule-based verdicts and wording,
+    and the gaps they change are recomputed and worded by us, so nothing the writer said goes stale."""
+    assessed_rows = assessed_rows or []
+    assessed = {str(r["shelter_id"]): assess_mod.shape(r) for r in assessed_rows}
     p = brief_plan.plan(f)
     allowed = brief_plan.numbers_in_facts(f, p)
     smap = p["source_map"]
@@ -364,6 +444,14 @@ def assemble_brief(f: dict, j: schemas.BriefJudgments | None, req: schemas.Brief
         shelter = shapes.shelter(row)
         shelter["place_id"] = next((s["place_id"] for s in v["sources"] if s["place_id"]), shelter["place_id"])
         src_ids = [s["id"] for s in v["sources"]]
+        a = assessed.get(sid)
+        shelter["field_assessment"] = a
+        if a:  # the writer judged without this evidence: the rule decides, in our words
+            destinations.append({"shelter": shelter, "serves": d["serves"], "straight_line_km": d["straight_line_km"],
+                                 "verification": v, "verdict": _default_verdict(v, shelter, a),
+                                 "verdict_reason": [*_default_verdict_reason(v, shelter, src_ids, assessed=True),
+                                                    _field_segment(a)]})
+            continue
         jv = verdicts.get(sid)
         verdict = _guard_verdict(jv.verdict, v, shelter, sid) if jv else _default_verdict(v, shelter)
         reason = [{"text": s.text, "source_ids": keep_sources(s.source_ids), "freshness": s.freshness}
@@ -382,8 +470,16 @@ def assemble_brief(f: dict, j: schemas.BriefJudgments | None, req: schemas.Brief
                              "verification": v, "verdict": verdict, "verdict_reason": reason})
 
     gaps = (next(iter(f.get("gaps", {}).values()), {}) or {}).get("gaps", [])
+    candidate_ids = {str(s["shelter_id"]) for c in f.get("candidates", {}).values() for s in c["shelters"]}
+    touched = (set(assessed) & (candidate_ids | set(f.get("verifications", {}))))
+    stale = set()
+    if touched:  # access gaps change when an operator answers; recompute and word them ourselves
+        stale = {"no_accessible_destination", "unassessed_access"}
+        gaps = compute_gaps(_with_field_answers(f, assessed), brief_plan.reachable_km(f))
     fixes = []
     for fx in (j.fixes if j else []):
+        if fx.category in stale:
+            continue
         if not (_ok_text(fx.title, allowed, "fix title") and _ok_text(fx.recommendation, allowed, "fix text")):
             continue
         fixes.append({"priority": fx.priority, "category": fx.category, "title": fx.title,
@@ -394,23 +490,43 @@ def assemble_brief(f: dict, j: schemas.BriefJudgments | None, req: schemas.Brief
                       "source_ids": keep_sources(fx.source_ids)})
     covered = {fx["category"] for fx in fixes}
     for g in gaps:  # every gap category gets at least one fix, worded by us if the writer missed it
-        if g["category"] not in covered:
+        if g["category"] in stale:  # recomputed after a field answer: one fix per gap, as the writer gave
+            fixes.append(_fallback_fix(g, county))
+        elif g["category"] not in covered:
             fixes.append(_fallback_fix(g, county))
             covered.add(g["category"])
+    for d in destinations:  # an operator said no: that is a fix of its own, first in line
+        a = d["shelter"].get("field_assessment")
+        if a and a["wheelchair_unaccompanied"] == "no" and d["verification"]["status"] not in DROPPED:
+            # -1 sorts ahead of the writer's priority 1 (0 means "unranked" and sorts last below)
+            fixes.append({**_field_fix(d["shelter"]["shelter_id"], d["shelter"], a, d["serves"]), "priority": -1})
     fixes.sort(key=lambda fx: (fx["priority"] or 99))
     for i, fx in enumerate(fixes, 1):
         fx["priority"] = i
 
     texts = {u.topic.strip().lower(): u for u in (j.unknowns_text if j else [])}
     unknowns = []
+    closed_by_phone = assess_mod.closes_unrecorded(assessed_rows)
+    both_blank_answered = sum(1 for d in destinations
+                              if d["verification"]["wheelchair"]["agreement"] == "both_blank"
+                              and (d["shelter"].get("field_assessment") or {}).get("wheelchair_unaccompanied")
+                              in ("yes", "no"))
     for u in p["unknowns"]:
         why, how = brief_plan.UNKNOWN_DEFAULTS[u["topic"]]
         ju = texts.get(u["topic"].lower())
-        if ju and _ok_text(ju.why, allowed, "unknown why") and _ok_text(ju.how_to_close, allowed, "unknown how"):
+        adjust = {"Wheelchair access": closed_by_phone,
+                  "Wheelchair access after Google Maps": both_blank_answered}.get(u["topic"], 0)
+        if adjust and u["count"] is not None:  # the writer's text quotes the old count: use ours
+            u = {**u, "count": max(0, u["count"] - adjust)}
+            how = f"{how} {adjust} answered by phone so far."
+        elif ju and _ok_text(ju.why, allowed, "unknown why") and _ok_text(ju.how_to_close, allowed, "unknown how"):
             why, how = ju.why, ju.how_to_close
         unknowns.append({**u, "why": why, "how_to_close": how})
 
-    headline = j.headline if j and _ok_text(j.headline, allowed, "headline") else _headline(p)
+    if touched or closed_by_phone:
+        headline = _headline(p, assessed)
+    else:
+        headline = j.headline if j and _ok_text(j.headline, allowed, "headline") else _headline(p)
     power = p["power"]
     return {
         "county": {"county_fips": req.county_fips, "name": county.get("name") or req.county_fips,

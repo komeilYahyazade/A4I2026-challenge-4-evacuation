@@ -154,6 +154,14 @@ h1, h2, h3, h4 { margin: 0; line-height: 1.25; }
 .seg .src { font-size: 12px; color: var(--text-2); margin-top: 2px; }
 .fresh { font-size: 10px; border: 1px solid var(--border); border-radius: 8px; padding: 0 6px; margin-left: 5px; color: var(--muted); white-space: nowrap; }
 .fresh.live { border-color: var(--accent); color: var(--accent); }
+.fresh.field { border-color: #8e44ad; color: #8e44ad; }
+.assess { border-left: 3px solid #8e44ad; border-radius: 0; }
+.assess .turn { margin: 6px 0; white-space: pre-wrap; }
+.assess .turn.you { color: var(--muted); }
+.assess .turn.you::before { content: "You: "; font-weight: 600; }
+.assess .contact { background: rgba(142, 68, 173, 0.06); padding: 6px 8px; margin: 6px 0; }
+.assess textarea { width: 100%; min-height: 54px; box-sizing: border-box; font: inherit; }
+.assess .saved { color: #8e44ad; font-weight: 600; }
 .class-line { font-size: 12.5px; margin-top: 6px; }
 .class-line b { letter-spacing: .03em; }
 .class-line .walk { color: var(--good); }

@@ -1,6 +1,6 @@
 // One function per /v1 route. Same origin: server.py forwards /v1 to the private readiness-api.
 import type {
-  ApiErrorBody, AuditResponse, BriefStatus, ChatResponse, CountiesResponse, CountyInsights, CountyMap,
+  ApiErrorBody, AssessResponse, AuditResponse, BriefStatus, ChatResponse, CountiesResponse, CountyInsights, CountyMap,
   Health, ShelterDetail, ShelterVerification, Track,
 } from "./types";
 
@@ -44,6 +44,9 @@ export const api = {
       options: { reachable_km_no_vehicle: reachKm, max_shelters_to_verify: maxVerify, include_routes: routes },
     }),
   brief: (id: string) => call<BriefStatus>("GET", `/v1/briefs/${id}`),
+  refreshBrief: (id: string) => call<BriefStatus>("POST", `/v1/briefs/${id}/refresh`),
+  assess: (shelterId: string, message: string, sessionId: string | null) =>
+    call<AssessResponse>("POST", `/v1/shelters/${shelterId}/assess`, { message, session_id: sessionId }),
   audit: (id: string) => call<AuditResponse>("GET", `/v1/briefs/${id}/audit`),
   chat: (message: string, sessionId: string | null, fips: string | null, briefId: string | null) =>
     call<ChatResponse>("POST", "/v1/chat", { message, session_id: sessionId, county_fips: fips, brief_id: briefId }),

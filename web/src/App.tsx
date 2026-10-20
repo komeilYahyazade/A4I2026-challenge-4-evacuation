@@ -140,7 +140,12 @@ export default function App() {
               <div className="panel-body">
                 {tab === "details" && (
                   <ShelterPanel selection={selection} map={map} brief={brief} ins={ins} verifications={verifications} reachKm={controls.reachKm}
-                    onVerified={(v) => setVerifications((m) => ({ ...m, [v.shelter_id]: v }))} onSelect={select} />
+                    onVerified={(v) => setVerifications((m) => ({ ...m, [v.shelter_id]: v }))} onSelect={select}
+                    onAssessed={() => {
+                      // Straight away: re-assemble the brief on screen with the new assessment (no model call).
+                      if (briefId && brief) api.refreshBrief(briefId).then(setStatus)
+                        .catch((e) => setError(`Could not update the brief: ${(e as ApiError).message}`));
+                    }} />
                 )}
                 {tab === "main" && mode === "fixes" && <FixList brief={brief} map={map} onHighlight={setHighlight} onSelect={select} />}
                 {tab === "main" && mode === "brief" && (brief ? (

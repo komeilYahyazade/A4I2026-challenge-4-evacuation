@@ -21,6 +21,7 @@ MODEL_FOR = {
     "brief_complete.json": schemas.BriefStatus,
     "audit.json": schemas.AuditResponse,
     "chat.json": schemas.ChatResponse,
+    "assess.json": schemas.AssessResponse,
     "error.json": schemas.ErrorResponse,
 }
 

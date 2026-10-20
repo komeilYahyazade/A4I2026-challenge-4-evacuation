@@ -11,6 +11,7 @@ from api import config
 from api.errors import ApiError
 from contract import schemas
 from readiness_agent import shapes
+from readiness_agent.tools import assessments as assess_mod
 from readiness_agent.tools import bq
 from readiness_agent.tools import verify as verify_tool
 
@@ -84,7 +85,9 @@ def shelter_detail(shelter_id: str) -> dict:
     row = verify_tool.load_shelter(shelter_id)
     if row is None:
         raise ApiError(404, "shelter_not_found", f"No shelter {shelter_id} in {config.STATE}")
-    return shapes.shelter_detail(row, LAST_VERIFICATION.get(shelter_id))
+    out = shapes.shelter_detail(row, LAST_VERIFICATION.get(shelter_id))
+    out["field_assessment"] = assess_mod.latest([shelter_id]).get(str(shelter_id))
+    return out
 
 
 async def verify(shelter_id: str, req: schemas.VerifyRequest) -> dict:

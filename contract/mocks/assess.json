@@ -1,0 +1,16 @@
+{
+  "session_id": "asm_mock000001",
+  "shelter_id": "70851",
+  "reply": "Harborside Events Center Special Needs, 1375 Monroe St, Fort Myers. FEMA never recorded whether a wheelchair user can get in, and nobody has assessed it. Can you get hold of the operator? Google Maps lists a public number for the building.",
+  "contact": {
+    "checked_at": "2026-10-20T15:41:02Z",
+    "maps_name": "Example Events Center",
+    "phone": "(239) 555-0100",
+    "website": "https://example.org",
+    "note": "Main box office line.",
+    "sources": [
+      {"id": "src_1", "provider": "Google Maps", "title": "Example Events Center", "uri": "https://maps.google.com/?cid=1", "place_id": "ChIJexample"}
+    ]
+  },
+  "saved": null
+}

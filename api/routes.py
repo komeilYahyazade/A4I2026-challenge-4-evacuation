@@ -1,4 +1,4 @@
-"""The nine /v1 routes (BUILD_SPEC.md section 10). Each route serves its mock until it is live.
+"""The /v1 routes (BUILD_SPEC.md section 10). Each route serves its mock until it is live.
 
 Live implementations are imported inside the handler so a mock-only deploy never loads BigQuery
 or the agents.
@@ -69,6 +69,16 @@ async def verify(shelter_id: str, req: schemas.VerifyRequest | None = None):
     return await data.verify(shelter_id, req)
 
 
+@router.post("/shelters/{shelter_id}/assess", response_model=schemas.AssessResponse)
+async def assess(shelter_id: str, req: schemas.AssessRequest):
+    if not config.is_live("assess"):
+        body = mocks.mock("assess.json")
+        body["shelter_id"] = shelter_id
+        return body
+    from api import assess as assess_impl
+    return await assess_impl.assess(shelter_id, req)
+
+
 @router.post("/briefs", response_model=schemas.BriefAccepted, status_code=202)
 async def create_brief(req: schemas.BriefRequest):
     _check_fips(req.county_fips)
@@ -88,6 +98,18 @@ def get_brief(brief_id: str):
     if body is None:
         raise ApiError(404, "brief_not_found", f"No brief {brief_id} (jobs live in memory and expire)")
     return body
+
+
+@router.post("/briefs/{brief_id}/refresh", response_model=schemas.BriefStatus)
+async def refresh_brief(brief_id: str):
+    """Re-assemble a finished brief with the latest field assessments. No model call."""
+    if not config.is_live("briefs"):
+        body = mocks.brief_status(brief_id)
+        if body is None:
+            raise ApiError(404, "brief_not_found", f"No brief {brief_id} (jobs live in memory and expire)")
+        return body
+    from api import briefs
+    return await briefs.refresh(brief_id)
 
 
 @router.get("/briefs/{brief_id}/audit", response_model=schemas.AuditResponse)

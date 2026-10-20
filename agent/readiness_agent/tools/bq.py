@@ -20,6 +20,18 @@ PARAM_TYPES = {
     "geo_ids": "ARRAY<STRING>",
     "shelter_ids": "ARRAY<STRING>",
     "place_id": "STRING",
+    # field assessments (sql/16_insert_assessment.sql)
+    "assessment_id": "STRING",
+    "shelter_name": "STRING",
+    "county": "STRING",
+    "operator_notes": "STRING",
+    "wheelchair": "BOOL",
+    "ramp": "BOOL",
+    "generator": "BOOL",
+    "verified_status": "STRING",
+    "assessor_role": "STRING",
+    "session_id": "STRING",
+    "source": "STRING",
 }
 
 _client: bigquery.Client | None = None

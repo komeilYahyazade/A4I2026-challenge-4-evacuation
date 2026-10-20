@@ -19,7 +19,7 @@ VERSION = "0.2.0"
 MOCK_MODE = os.environ.get("MOCK_MODE", "1") == "1"
 LIVE_ROUTES = {r.strip() for r in os.environ.get("LIVE_ROUTES", "").split(",") if r.strip()}
 
-ROUTES = ("counties", "map", "insights", "shelter", "verify", "briefs", "audit", "chat")
+ROUTES = ("counties", "map", "insights", "shelter", "verify", "assess", "briefs", "audit", "chat")
 
 
 def is_live(route: str) -> bool:

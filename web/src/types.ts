@@ -1,14 +1,16 @@
 // Mirror of contract/schemas.py (v0.2). Ids are strings; recorded flags are three-state.
 
 export type Flag = "yes" | "no" | "unrecorded";
-export type Freshness = "historical" | "live";
+export type Freshness = "historical" | "live" | "field";
+export type FieldAnswer = "yes" | "no" | "unclear";
+export type OptionalAnswer = "yes" | "no" | "unknown";
 export type VerificationStatus = "confirmed" | "renamed" | "closed" | "not_found" | "unclear" | "error";
 export type MapsWheelchair = "yes" | "no" | "no_answer";
 export type Agreement = "agree" | "disagree" | "record_blank" | "maps_blank" | "both_blank";
 export type Verdict = "holds_up" | "verify_before_season" | "do_not_rely";
 export type FixCategory =
   | "no_accessible_destination" | "unassessed_access" | "generator_gap"
-  | "shelter_in_surge_zone" | "record_mismatch" | "medical_needs_gap";
+  | "shelter_in_surge_zone" | "record_mismatch" | "medical_needs_gap" | "field_assessment";
 export type Track = "shelter_readiness" | "getting_people_out" | "medically_dependent";
 
 export interface ApiErrorBody { code: string; message: string; retryable: boolean }
@@ -21,7 +23,22 @@ export interface Shelter {
   nearest_geo_id: string | null; usage: string | null; evacuation_capacity: number | null;
   post_impact_capacity: number | null; wheelchair_accessible: Flag; generator_onsite: Flag;
   in_surge_slosh_area: Flag; in_100_yr_floodplain: Flag; is_medical: boolean; place_id: string | null;
-  source: "fema_nss"; freshness: "historical";
+  source: "fema_nss"; freshness: "historical"; field_assessment?: FieldAssessment | null;
+}
+/** What the shelter operator told the manager. "unclear" is unrecorded, never "no". */
+export interface FieldAssessment {
+  assessment_id: string | null; shelter_id: string; wheelchair_unaccompanied: FieldAnswer;
+  ramp_unlocked_24_7: OptionalAnswer; generator_powers_medical_outlets: OptionalAnswer;
+  notes: string | null; assessor_role: string | null; assessed_at: string;
+  source: "field_assessment"; freshness: "field";
+}
+/** The building's public listing from Google Maps, for the manager to call. Never stored. */
+export interface ShelterContact {
+  checked_at: string; maps_name: string | null; phone: string | null; website: string | null;
+  note: string | null; sources: Source[];
+}
+export interface AssessResponse {
+  session_id: string; shelter_id: string; reply: string; contact: ShelterContact | null; saved: FieldAssessment | null;
 }
 export interface ShelterDetail extends Shelter {
   pet_accommodations_code: string | null; population_code: string | null; shelter_status_code: string | null;
