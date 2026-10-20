@@ -18,7 +18,10 @@ export function ChatPanel() {
   const [text, setText] = useState("");
   const session = useRef<string | null>(null);
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => end.current?.scrollIntoView({ behavior: "smooth" }), [s.chat.length]);
+  // Braces matter: newer browsers return a Promise from scrollIntoView, and React would call it as a cleanup.
+  useEffect(() => {
+    end.current?.scrollIntoView({ behavior: "smooth" });
+  }, [s.chat.length]);
 
   const send = (t: string) => {
     const v = t.trim();
