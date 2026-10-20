@@ -1,6 +1,8 @@
-import { useMemo, useState } from "react";
-import type { CannotTell, FixItem, TriCount, WhereRow } from "../contract";
+import { useEffect, useMemo, useState } from "react";
+import type { CannotTell, FixItem, OperatorAssessment, TriCount, WhereRow } from "../contract";
 import { ago, coords, downReasonLabel, fmt, inGeometry, shelterName } from "../derive";
+import { api, type PlanRef } from "../api/rest";
+import { CONFIG, MOCK_ONLY } from "../config";
 import { FIXTURE_NOTE } from "../mock/lee";
 import { useStore } from "../store";
 import { shelterViews } from "../views";
@@ -241,7 +243,7 @@ function WhereList({ rows }: { rows: WhereRow[] }) {
   );
 }
 
-function FixSection({ title = "3 · What to fix before the season" }: { title?: string }) {
+function FixSection({ title = "3 · What to fix before the season", planFirst = false }: { title?: string; planFirst?: boolean }) {
   const { s, d, act } = useStore();
   const alloc = s.rehearsalMode && s.rehearsal ? s.rehearsal.after : s.allocation;
   const briefFixes = s.brief?.fix_before_season || [];
@@ -273,6 +275,12 @@ function FixSection({ title = "3 · What to fix before the season" }: { title?: 
   return (
     <section className="seg" id="seg-fix">
       <h3>{title}</h3>
+      {!planFirst && briefFixes.length > 0 && (
+        <>
+          <h4>From the brief</h4>
+          <ol className="fixes">{briefFixes.map((f, i) => item(f, i))}</ol>
+        </>
+      )}
       {headline && (
         <div className="headline-gap">
           <b>{headline.subject}</b>
@@ -310,7 +318,7 @@ function FixSection({ title = "3 · What to fix before the season" }: { title?: 
           </ol>
         </>
       )}
-      {briefFixes.length > 0 && (
+      {planFirst && briefFixes.length > 0 && (
         <>
           <h4>From the brief</h4>
           <ol className="fixes">{briefFixes.map((f, i) => item(f, i))}</ol>
@@ -430,7 +438,78 @@ function PlanView() {
           {String(a.params.demand_rule || "")} {String(a.params.capacity_rule || "")} {String(a.params.cost_rule || "")}
         </p>
       )}
-      <FixSection title="What to fix before the season" />
+      <PlanApproval kind="allocation" />
+      <FixSection title="What to fix before the season" planFirst />
+    </div>
+  );
+}
+
+export function PlanApproval({ kind }: { kind: "allocation" | "rehearsal" }) {
+  const { s } = useStore();
+  const [name, setName] = useState("Lee County Emergency Manager");
+  const [plan, setPlan] = useState<PlanRef | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const mock = MOCK_ONLY || (kind === "allocation" ? s.sources.allocation : s.sources.rehearsal) === "mock";
+  const run = async (fn: () => Promise<PlanRef>) => {
+    setBusy(true);
+    setErr(null);
+    try {
+      setPlan(await fn());
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const create = () =>
+    run(async () =>
+      mock ? { plan_id: "MOCK-PLAN", version: 1, status: "DRAFT", created_by: name } : api.planCreate(kind, name, s.countyFips),
+    );
+  const approve = () =>
+    run(async () =>
+      mock
+        ? { ...plan!, status: "APPROVED", approved_by: name, approved_at: new Date().toISOString() }
+        : { ...plan!, ...(await api.planApprove(plan!.plan_id, name)), approved_by: name },
+    );
+  return (
+    <div className="approval">
+      <div className="approval-head">
+        <b>A person approves before anything is published</b>
+        {mock && <span className="mock-badge">MOCK</span>}
+      </div>
+      {CONFIG.publicDemo && !mock ? (
+        <div className="small muted">
+          <button className="btn btn-small" disabled>
+            Submit {kind} plan for approval
+          </button>{" "}
+          Approval needs a signed-in county user (local demo).
+        </div>
+      ) : (
+        <label className="small">
+          Name{" "}
+          <input value={name} onChange={(e) => setName(e.target.value)} />
+        </label>
+      )}
+      {!plan && !(CONFIG.publicDemo && !mock) && (
+        <button className="btn btn-small" disabled={busy || !name.trim()} onClick={create}>
+          {busy ? "Saving…" : `Submit ${kind} plan for approval`}
+        </button>
+      )}
+      {plan && (
+        <div className="small">
+          Plan <code>{plan.plan_id}</code> v{plan.version ?? 1} ·{" "}
+          <b className={plan.status === "APPROVED" ? "ok" : ""}>{plan.status}</b>
+          {plan.status === "APPROVED" && plan.approved_at ? ` by ${plan.approved_by} at ${new Date(plan.approved_at).toLocaleTimeString()}` : ""}
+          {plan.status !== "APPROVED" && (
+            <button className="btn btn-small" disabled={busy || !name.trim()} onClick={approve} style={{ marginLeft: 8 }}>
+              {busy ? "Approving…" : `Approve as ${name}`}
+            </button>
+          )}
+        </div>
+      )}
+      {err && <div className="small red">{err}</div>}
+      <div className="small muted">Stored in readiness_ops.plans. Only Google Maps place IDs are kept, never Maps content.</div>
     </div>
   );
 }
@@ -556,20 +635,142 @@ function RehearsalResult() {
         </>
       )}
       <p className="small muted">{r.note}</p>
-      <FixSection title="What the rehearsal says to fix" />
+      <PlanApproval kind="rehearsal" />
+      <FixSection title="What the rehearsal says to fix" planFirst />
     </>
   );
 }
 
-function LearnView() {
+export function LearnView() {
+  const { s } = useStore();
+  const shelters = useMemo(() => shelterViews(s).filter((x) => x.isPre), [s.map, s.brief, s.allocation]);
+  const unrecorded = useMemo(() => shelters.filter((x) => x.wheelchair === "UNRECORDED"), [shelters]);
+  const [shelterId, setShelterId] = useState<string>("");
+  const [unaccompaniedEntry, setUnaccompaniedEntry] = useState<boolean>(true);
+  const [medicalPower, setMedicalPower] = useState<boolean>(true);
+  const [reportedBy, setReportedBy] = useState<string>("Field Shelter Coordinator");
+  const [notes, setNotes] = useState<string>("Level entrance ramp, accessible restroom, and backup medical outlets verified on site.");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [records, setRecords] = useState<OperatorAssessment[]>([]);
+  const mock = MOCK_ONLY || Object.values(s.sources).includes("mock");
+
+  useEffect(() => {
+    if (!shelterId && (unrecorded[0]?.id || shelters[0]?.id)) {
+      setShelterId(unrecorded[0]?.id || shelters[0]?.id || "");
+    }
+  }, [shelterId, unrecorded, shelters]);
+
+  useEffect(() => {
+    if (mock) return;
+    void api
+      .assessments(s.countyFips)
+      .then((r) => setRecords(r.assessments || []))
+      .catch(() => {});
+  }, [s.countyFips, mock]);
+
+  const submit = async () => {
+    const chosen = shelters.find((x) => x.id === shelterId);
+    if (!chosen) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      if (mock) {
+        const rec: OperatorAssessment = {
+          shelter_id: chosen.id,
+          shelter_name: chosen.name,
+          county: s.countyFips,
+          operator_name: reportedBy,
+          operator_statement: notes,
+          audit_status: "REPORTED (UNVERIFIED)",
+          wheelchair_status: unaccompaniedEntry ? "YES" : "NO",
+          generator_status: medicalPower ? "YES" : "NO",
+          timestamp_utc: new Date().toISOString(),
+        };
+        setRecords((prev) => [rec, ...prev]);
+      } else {
+        const res = await api.assessShelter({
+          shelter_id: chosen.id,
+          shelter_name: chosen.name,
+          county: s.countyFips,
+          operator_name: reportedBy,
+          operator_statement: notes,
+          unaccompanied_entry: unaccompaniedEntry,
+          medical_power_outlets: medicalPower,
+        });
+        setRecords((prev) => [res.assessment, ...prev]);
+      }
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="brief">
-      <Header title="Learn: after-action" />
-      <p>
-        After the storm, record which shelters really opened and their real capacities. Those first-party reports, not Google Maps, become
-        next year's inventory. This closes the loop: the registry learns from ground truth.
+      <Header
+        title="Learn: field assessment & after-action"
+        subtitle="Close the UNRECORDED gap with first-party shelter operator reports (labeled REPORTED until audited)."
+      />
+      <p className="small">
+        FEMA leaves wheelchair access blank on <b>{unrecorded.length} of {shelters.length}</b> pre-landfall shelters in this county.
+        Record operator walk-throughs and post-storm actuals here so next season&apos;s inventory learns from ground truth rather than
+        leaving fields blank.
       </p>
-      <p className="muted small">Not built today. It would write to readiness_ops.status_reports and decision_log.</p>
+      <div className="approval" style={{ display: "grid", gap: 8 }}>
+        <div className="approval-head">
+          <b>Log shelter operator ADA / generator check</b>
+          {mock && <span className="mock-badge">MOCK</span>}
+        </div>
+        <label className="small">
+          Shelter{" "}
+          <select value={shelterId} onChange={(e) => setShelterId(e.target.value)} style={{ maxWidth: "100%" }}>
+            {shelters.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.name} ({x.wheelchair})
+              </option>
+            ))}
+          </select>
+        </label>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <label className="small">
+            <input type="checkbox" checked={unaccompaniedEntry} onChange={(e) => setUnaccompaniedEntry(e.target.checked)} /> Unaccompanied wheelchair entry + ADA restroom
+          </label>
+          <label className="small">
+            <input type="checkbox" checked={medicalPower} onChange={(e) => setMedicalPower(e.target.checked)} /> Backup generator + medical power outlets
+          </label>
+        </div>
+        <label className="small">
+          Reported by{" "}
+          <input value={reportedBy} onChange={(e) => setReportedBy(e.target.value)} />
+        </label>
+        <label className="small">
+          Operator statement{" "}
+          <input value={notes} onChange={(e) => setNotes(e.target.value)} style={{ width: "100%" }} />
+        </label>
+        <button className="btn btn-small" disabled={busy || !shelterId || !reportedBy.trim()} onClick={() => void submit()}>
+          {busy ? "Recording…" : "Record operator assessment"}
+        </button>
+        {err && <div className="small red">{err}</div>}
+      </div>
+      {records.length > 0 && (
+        <>
+          <h4>Recorded operator assessments ({records.length})</h4>
+          <ul className="down-list">
+            {records.map((r, i) => (
+              <li key={`${r.shelter_id}:${r.timestamp_utc || i}`}>
+                <b>{r.shelter_name}</b> · wheelchair: <b>{r.wheelchair_status}</b> · generator: <b>{r.generator_status}</b>{" "}
+                <Label label="RECORDED" title={r.audit_status} />
+                <div className="small muted">
+                  {r.operator_name || "Operator"} · {r.timestamp_utc ? new Date(r.timestamp_utc).toLocaleTimeString() : ""}{" "}
+                  {r.operator_statement ? `— ${r.operator_statement}` : ""}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   );
 }

@@ -19,7 +19,7 @@ STATE = {"county_fips": "12071"}
 
 
 def rubric(rid: str, text: str) -> Rubric:
-    return Rubric(rubric_id=rid, rubric_content=RubricContent(text_property=text))
+    return Rubric(rubric_id=rid, rubric_content=RubricContent(text_property=text), type="FINAL_RESPONSE_QUALITY")
 
 
 CASES = [
@@ -58,8 +58,9 @@ def main() -> None:
             invocation_id=f"{eid}-1",
             user_content=types.Content(role="user", parts=[types.Part(text=text)]),
             intermediate_data=IntermediateData(tool_uses=[types.FunctionCall(name=t, args={}) for t in tools]),
+            rubrics=rubrics,
         )
-        cases.append(EvalCase(eval_id=eid, conversation=[inv], rubrics=rubrics,
+        cases.append(EvalCase(eval_id=eid, conversation=[inv],
                               session_input=SessionInput(app_name="agent", user_id="eval", state=STATE)))
     es = EvalSet(eval_set_id="readiness", name="Lee County readiness",
                  description="README questions, blank-field honesty, emergency refusal, rehearsal", eval_cases=cases)

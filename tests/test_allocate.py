@@ -143,3 +143,58 @@ def test_county_headline_gap_first():
     g = out["gaps"][0]
     assert g["type"] == "UNASSIGNED_DEMAND" and g["ref"] == {"kind": "county", "id": "12071", "lat": None, "lng": None}
     assert g["severity"] == "HIGH" and g["persons_affected"] == 200
+
+
+def test_tool_path_returns_compact_and_rest_path_full(monkeypatch):
+    import asyncio
+    import json
+
+    import agent.allocate as m
+    from agent.contract import validate
+
+    monkeypatch.setattr(m, "fetch_inputs", lambda cfg, f, km: ([tract("12071000100", hh=150)],
+                                                              [edge("12071000100", "A", 2.0, cap=100)]))
+
+    class Ctx:
+        state: dict = {}
+
+    full = asyncio.run(m.allocate_county("12071"))
+    small = asyncio.run(m.allocate_county("12071", tool_context=Ctx()))
+    assert full.get("compact") is None and full["assignments"]
+    assert small["compact"] is True and small["assignments"] == [] and small["full"]["path"] == "/api/allocate"
+    assert small["totals"] == full["totals"] and small["gaps"][0]["ref"]["kind"] == "county"
+    assert len(json.dumps(small)) < len(json.dumps(full))
+    validate(small)
+    validate(full)
+
+
+def test_duplicate_shelter_records_are_excluded_not_double_counted():
+    e1 = edge("T1", "259512", 2.0, cap=500) | {"shelter_name": "Hudson Elementary"}
+    e2 = edge("T1", "259513", 2.0, cap=500) | {"shelter_name": "Hudson Elementary"}
+    out = solve([tract("T1", hh=300)], [e1, e2])
+    assert out["totals"]["usable_capacity"] == 500
+    assert by_shelter(out) == {"259512": 500}
+    assert {"shelter_id": "259513", "name": "Hudson Elementary", "reason": "DUPLICATE_RECORD"} in \
+        out["params"]["excluded_shelters"]
+
+
+def test_session_dropped_shelters_propagate_into_allocate_county(monkeypatch):
+    import asyncio
+
+    import agent.allocate as m
+
+    monkeypatch.setattr(
+        m,
+        "fetch_inputs",
+        lambda cfg, f, km: (
+            [tract("12071000100", hh=20)],
+            [edge("12071000100", "A", 1.0, cap=100), edge("12071000100", "B", 4.0, cap=100)],
+        ),
+    )
+
+    class Ctx:
+        state = {"dropped_shelter_ids": ["A"]}
+
+    res = asyncio.run(m.allocate_county("12071", tool_context=Ctx()))
+    assert res["params"]["shelters_down"] == ["A"]
+    assert res["totals"]["assigned_persons"] == 40

@@ -22,6 +22,42 @@ def test_single_agent_on_gemini_3_with_maps_and_all_tools():
         assert fn.__name__ in names
 
 
+def test_instruction_names_the_bigquery_project_and_datasets():
+    # Without this the agent guesses project ids for the BigQuery MCP tools.
+    for model in ("gemini-3.6-flash", "gemini-2.5-flash"):
+        agent = build_root_agent(AgentConfig(project_id="demo-project", model_name=model))
+        assert "demo-project" in agent.instruction
+        assert "evacuation_readiness" in agent.instruction and "readiness_ops" in agent.instruction
+        assert "{" not in agent.instruction and "}" not in agent.instruction
+
+
+def test_instruction_points_free_sql_at_the_views_not_the_raw_tables():
+    # execute_sql_readonly on raw shelters skips the views' rules (unrecorded capacity, inactive names).
+    agent = build_root_agent(AgentConfig(project_id="demo-project"))
+    for view in ("v_shelter_evidence", "v_county_shelter_summary", "v_tract_need"):
+        assert f"demo-project.readiness_ops.{view}" in agent.instruction
+    assert "demo-project.evacuation_readiness.shelters" not in agent.instruction
+
+
+def test_instruction_names_the_default_county_for_unscoped_questions():
+    # The console's suggestions ("Which of my shelters...") name no county.
+    agent = build_root_agent(AgentConfig(project_id="demo-project", default_county_fips="12071"))
+    assert "12071" in agent.instruction
+
+
+def test_instruction_without_a_project_is_the_base_instruction():
+    assert build_root_agent(AgentConfig()).instruction == SYSTEM_INSTRUCTION
+
+
+def test_tool_errors_go_back_to_the_model_instead_of_ending_the_turn():
+    agent = build_root_agent(AgentConfig(project_id="demo-project"))
+    result = agent.on_tool_error_callback(
+        tool=None, args={"county_fips": "00000"}, tool_context=None,
+        error=ValueError("County 00000 is not in FL"))
+    assert result["status"] == "error"
+    assert "County 00000 is not in FL" in result["error"]
+
+
 def test_sub_agent_fallback_on_gemini_2_5():
     agent = build_root_agent(AgentConfig(project_id="demo-project", model_name="gemini-2.5-flash"))
     assert isinstance(agent.tools[0], AgentTool)
@@ -33,7 +69,8 @@ def test_instruction_has_no_state_placeholders_and_key_rules():
     for phrase in ("911", "UNRECORDED", "never which tract", "ONE named building", "Google Maps",
                    "only in a turn where you called google_maps or verify_shelters", "not zero spaces",
                    "recorded in the surge zone", "[APPROXIMATE]", "INACTIVE or CLOSED", "Never paste URLs",
-                   "ranking may_need_help", "Never use ranking composite_v0 to plan"):
+                   "ranking may_need_help", "Never use ranking composite_v0 to plan",
+                   "do not recommend a shelter to them", "Decline unrelated requests"):
         assert phrase in SYSTEM_INSTRUCTION
 
 
@@ -84,6 +121,12 @@ def test_managed_bigquery_mcp_is_opt_in():
     assert ts[0]._header_provider is not None
 
 
+def test_managed_bigquery_mcp_exposes_only_small_read_tools():
+    # The full tool list is ~630 KB of schema and trips the per-minute token quota.
+    ts = bigquery_mcp_toolset(AgentConfig(project_id="demo-project", bigquery_mcp_enabled=True))
+    assert ts[0].tool_filter == ["list_table_ids", "execute_sql_readonly"]
+
+
 def test_audit_reports_coverage_of_the_countys_need():
     from agent.tools import coverage
 
@@ -94,3 +137,12 @@ def test_audit_reports_coverage_of_the_countys_need():
     assert c["households_no_vehicle"] == {"covered": 1095, "county_total": 14553, "share": round(1095 / 14553, 4)}
     assert c["mobile_homes"]["covered"] == 10
     assert coverage([], {})["pop_65_plus"]["share"] is None
+
+
+def test_unsafe_tools_are_not_reachable_from_chat():
+    names = {fn.__name__ for fn in FUNCTION_TOOLS}
+    for unsafe in ("verify_shelter_on_google_maps", "audit_county_shelters_with_live_maps",
+                   "build_live_county_readiness_brief", "submit_shelter_operator_assessment", "ask_evacuation_agent"):
+        assert unsafe not in names
+    # Every Maps call reachable from chat goes through verify.py's budget, cap and decision rules.
+    assert {"verify_shelters", "build_readiness_brief"} <= names

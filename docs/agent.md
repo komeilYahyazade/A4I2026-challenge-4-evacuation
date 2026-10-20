@@ -36,6 +36,20 @@ adk web .                           # pick "agent"
 
 Tests run without cloud access: `uv pip install pytest sqlglot && python -m pytest`.
 
+## Voice
+
+`voice/` is a second ADK app, served at `/run_live`, on `gemini-3.8-live`. Gemini Live is regional, so
+its model is pinned to `us-central1` through `client_kwargs`. The text agent and every grounded
+Maps call stay at `global`. It has the same function tools and the same planning rules, without the Maps built-in or MCP toolsets.
+`VOICE_INSTRUCTION` is the text prompt's core with the output section replaced by spoken rules:
+- at most three short sentences
+- every number with its label in words
+- no IDs or URLs read aloud
+- "the Google Maps sources are on screen" after any Maps fact, and a spoken Google Maps disclosure
+  on first use, as the attribution rules require for voice
+
+The companion screen shows the sources. `VOICE_MODEL` and `VOICE_LOCATION` override the defaults.
+
 ## Managed MCP
 
 The challenge requires consuming at least one managed MCP server. Three are supported; set

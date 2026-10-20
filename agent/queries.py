@@ -20,8 +20,8 @@ SHELTER_COLUMNS = """
   s.evacuation_capacity,
   s.post_impact_capacity,
   -- Blank capacity, or 0 on a shelter that is (or may be) pre-landfall, means nobody recorded it.
-  -- A 0 on a POST-only shelter is a legitimate value.
-  CASE WHEN s.evacuation_capacity IS NULL THEN 'UNRECORDED'
+  -- A 0 on a POST-only shelter is a legitimate value. A negative number (FEMA's -1) never is.
+  CASE WHEN s.evacuation_capacity IS NULL OR s.evacuation_capacity < 0 THEN 'UNRECORDED'
        WHEN s.evacuation_capacity = 0 AND IFNULL(s.usage IN UNNEST(@pre_landfall_usage), TRUE) THEN 'UNRECORDED'
        ELSE 'RECORDED' END AS capacity_status,
   IFNULL(s.evacuation_capacity > @capacity_max, FALSE) AS capacity_implausible,
@@ -137,7 +137,8 @@ c AS (
 ),
 s AS (
   SELECT
-    sh.usage IN UNNEST(@pre_landfall_usage) AS is_pre_landfall,
+    (sh.usage IN UNNEST(@pre_landfall_usage)
+      AND NOT REGEXP_CONTAINS(UPPER(IFNULL(sh.shelter_name, '')), r'\b(INACTIVE|CLOSED|DEMOLISHED|DO NOT USE)\b')) AS is_pre_landfall,
     sh.wheelchair_accessible,
     ST_GEOGPOINT(sh.longitude, sh.latitude) AS g
   FROM ${shelters} AS sh
@@ -332,6 +333,7 @@ gen AS (
   FROM ${shelters}
   WHERE generator_onsite IS TRUE
     AND usage IN UNNEST(@pre_landfall_usage)
+    AND NOT REGEXP_CONTAINS(UPPER(IFNULL(shelter_name, '')), r'\b(INACTIVE|CLOSED|DEMOLISHED|DO NOT USE)\b')
     AND latitude IS NOT NULL AND longitude IS NOT NULL
 )
 SELECT
@@ -418,3 +420,435 @@ SELECT
 FROM ${site_hazard}
 WHERE shelter_id IN UNNEST(@shelter_ids)
 """
+
+# ---------------------------------------------------------------------------
+# Deduplicated shelter queries, county summaries, care-facility proximity,
+# county-centroid fallback, map layers, and operator field assessments.
+# ---------------------------------------------------------------------------
+
+DEDUPLICATED_SHELTERS_CTE = """
+dedup_shelters AS (
+  SELECT
+    s.*,
+    COUNT(*) OVER (
+      PARTITION BY UPPER(TRIM(IFNULL(s.shelter_name, ''))),
+                   UPPER(TRIM(IFNULL(s.address_1, '')))
+    ) AS duplicate_group_size,
+    ROW_NUMBER() OVER (
+      PARTITION BY UPPER(TRIM(IFNULL(s.shelter_name, ''))),
+                   UPPER(TRIM(IFNULL(s.address_1, '')))
+      ORDER BY
+        IF(s.wheelchair_accessible IS NOT NULL, 0, 1),
+        IF(s.generator_onsite IS NOT NULL, 0, 1),
+        IF(s.usage IN UNNEST(@pre_landfall_usage), 0, 1),
+        GREATEST(IFNULL(s.evacuation_capacity, 0), IFNULL(s.post_impact_capacity, 0)) DESC,
+        s.shelter_id
+    ) AS dedup_rank
+  FROM ${shelters} AS s
+)
+"""
+
+COUNTY_SHELTERS_DEDUP = (
+    "WITH "
+    + DEDUPLICATED_SHELTERS_CTE
+    + """
+SELECT
+  ${shelter_columns},
+  s.duplicate_group_size
+FROM dedup_shelters AS s
+WHERE s.dedup_rank = 1
+  AND s.county_fips = @county_fips
+ORDER BY s.shelter_name
+"""
+)
+
+LIST_COUNTIES = """
+WITH shelter_rollup AS (
+  SELECT
+    county_fips,
+    ANY_VALUE(county_name) AS county_name,
+    COUNT(*) AS total_shelter_rows,
+    COUNT(DISTINCT CONCAT(UPPER(TRIM(IFNULL(shelter_name, ''))), '|', UPPER(TRIM(IFNULL(address_1, '')))))
+      AS deduplicated_shelters,
+    COUNTIF(usage IN ('EVAC', 'BOTH')) AS pre_landfall_shelters,
+    COUNTIF(wheelchair_accessible IS TRUE) AS wheelchair_yes,
+    COUNTIF(wheelchair_accessible IS FALSE) AS wheelchair_no,
+    COUNTIF(wheelchair_accessible IS NULL) AS wheelchair_unrecorded,
+    COUNTIF(generator_onsite IS TRUE) AS generator_yes,
+    COUNTIF(generator_onsite IS FALSE) AS generator_no,
+    COUNTIF(generator_onsite IS NULL) AS generator_unrecorded,
+    COUNTIF(is_medical IS TRUE) AS medical_shelters
+  FROM ${shelters}
+  WHERE county_fips IS NOT NULL
+  GROUP BY county_fips
+),
+tract_rollup AS (
+  SELECT
+    county_fips,
+    COUNT(*) AS tract_count,
+    SUM(total_pop) AS total_pop,
+    SUM(households) AS total_households,
+    SUM(households_no_vehicle) AS households_no_vehicle,
+    SUM(pop_65_plus) AS pop_65_plus,
+    SUM(mobile_homes) AS mobile_homes,
+    ROUND(AVG(lat), 5) AS centroid_lat,
+    ROUND(AVG(lon), 5) AS centroid_lon
+  FROM ${tracts}
+  WHERE total_pop > 0
+  GROUP BY county_fips
+)
+SELECT
+  t.county_fips,
+  COALESCE(s.county_name, p.county, t.county_fips) AS county_name,
+  t.tract_count,
+  t.total_pop,
+  t.total_households,
+  t.households_no_vehicle,
+  t.pop_65_plus,
+  t.mobile_homes,
+  t.centroid_lat AS lat,
+  t.centroid_lon AS lng,
+  IFNULL(s.total_shelter_rows, 0) AS total_shelter_rows,
+  IFNULL(s.deduplicated_shelters, 0) AS deduplicated_shelters,
+  IFNULL(s.pre_landfall_shelters, 0) AS pre_landfall_shelters,
+  IFNULL(s.wheelchair_yes, 0) AS wheelchair_yes,
+  IFNULL(s.wheelchair_no, 0) AS wheelchair_no,
+  IFNULL(s.wheelchair_unrecorded, 0) AS wheelchair_unrecorded,
+  IFNULL(s.generator_yes, 0) AS generator_yes,
+  IFNULL(s.generator_no, 0) AS generator_no,
+  IFNULL(s.generator_unrecorded, 0) AS generator_unrecorded,
+  IFNULL(s.medical_shelters, 0) AS medical_shelters,
+  SAFE_CAST(p.all_dme AS INT64) AS power_dependent_dme
+FROM tract_rollup AS t
+LEFT JOIN shelter_rollup AS s USING (county_fips)
+LEFT JOIN ${power} AS p ON LPAD(CAST(p.fips_code AS STRING), 5, '0') = t.county_fips
+ORDER BY t.households_no_vehicle DESC, t.county_fips
+"""
+
+COUNTY_SUMMARY = """
+WITH county_tracts AS (
+  SELECT
+    county_fips,
+    COUNT(*) AS tract_count,
+    COUNTIF(lat IS NULL OR lon IS NULL) AS tracts_missing_coords,
+    SUM(total_pop) AS total_pop,
+    SUM(households) AS households,
+    SUM(households_no_vehicle) AS households_no_vehicle,
+    SUM(pop_65_plus) AS pop_65_plus,
+    SUM(mobile_homes) AS mobile_homes,
+    ROUND(AVG(lat), 5) AS centroid_lat,
+    ROUND(AVG(lon), 5) AS centroid_lon
+  FROM ${tracts}
+  WHERE county_fips = @county_fips AND total_pop > 0
+  GROUP BY county_fips
+),
+county_shelters_agg AS (
+  SELECT
+    county_fips,
+    ANY_VALUE(county_name) AS county_name,
+    COUNT(*) AS total_shelters,
+    COUNT(DISTINCT CONCAT(UPPER(TRIM(IFNULL(shelter_name, ''))), '|', UPPER(TRIM(IFNULL(address_1, '')))))
+      AS deduplicated_shelters,
+    COUNTIF(usage IN UNNEST(@pre_landfall_usage)) AS pre_landfall_shelters,
+    SUM(IF(usage IN UNNEST(@pre_landfall_usage)
+           AND evacuation_capacity IS NOT NULL
+           AND evacuation_capacity > 0
+           AND evacuation_capacity <= @capacity_max
+           AND NOT REGEXP_CONTAINS(UPPER(IFNULL(shelter_name, '')), r'\\b(INACTIVE|CLOSED|DEMOLISHED|DO NOT USE)\\b'),
+           evacuation_capacity, 0)) AS plausible_pre_landfall_capacity,
+    COUNTIF(wheelchair_accessible IS TRUE) AS wheelchair_yes,
+    COUNTIF(wheelchair_accessible IS FALSE) AS wheelchair_no,
+    COUNTIF(wheelchair_accessible IS NULL) AS wheelchair_unrecorded,
+    COUNTIF(generator_onsite IS TRUE) AS generator_yes,
+    COUNTIF(generator_onsite IS FALSE) AS generator_no,
+    COUNTIF(generator_onsite IS NULL) AS generator_unrecorded,
+    COUNTIF(in_surge_slosh_area IS TRUE) AS surge_yes,
+    COUNTIF(in_surge_slosh_area IS FALSE) AS surge_no,
+    COUNTIF(in_surge_slosh_area IS NULL) AS surge_unrecorded,
+    COUNTIF(in_100_yr_floodplain IS TRUE) AS floodplain_yes,
+    COUNTIF(in_100_yr_floodplain IS FALSE) AS floodplain_no,
+    COUNTIF(in_100_yr_floodplain IS NULL) AS floodplain_unrecorded,
+    COUNTIF(is_medical IS TRUE) AS medical_shelters,
+    COUNTIF(REGEXP_CONTAINS(UPPER(IFNULL(shelter_name, '')), r'\\b(INACTIVE|CLOSED|DEMOLISHED|DO NOT USE)\\b'))
+      AS name_flagged_inactive
+  FROM ${shelters}
+  WHERE county_fips = @county_fips
+  GROUP BY county_fips
+)
+SELECT
+  t.county_fips,
+  COALESCE(s.county_name, p.county, t.county_fips) AS county_name,
+  t.tract_count,
+  t.tracts_missing_coords,
+  t.total_pop,
+  t.households,
+  t.households_no_vehicle,
+  t.pop_65_plus,
+  t.mobile_homes,
+  t.centroid_lat AS lat,
+  t.centroid_lon AS lng,
+  IFNULL(s.total_shelters, 0) AS total_shelters,
+  IFNULL(s.deduplicated_shelters, 0) AS deduplicated_shelters,
+  IFNULL(s.pre_landfall_shelters, 0) AS pre_landfall_shelters,
+  IFNULL(s.plausible_pre_landfall_capacity, 0) AS plausible_pre_landfall_capacity,
+  IFNULL(s.wheelchair_yes, 0) AS wheelchair_yes,
+  IFNULL(s.wheelchair_no, 0) AS wheelchair_no,
+  IFNULL(s.wheelchair_unrecorded, 0) AS wheelchair_unrecorded,
+  IFNULL(s.generator_yes, 0) AS generator_yes,
+  IFNULL(s.generator_no, 0) AS generator_no,
+  IFNULL(s.generator_unrecorded, 0) AS generator_unrecorded,
+  IFNULL(s.surge_yes, 0) AS surge_yes,
+  IFNULL(s.surge_no, 0) AS surge_no,
+  IFNULL(s.surge_unrecorded, 0) AS surge_unrecorded,
+  IFNULL(s.floodplain_yes, 0) AS floodplain_yes,
+  IFNULL(s.floodplain_no, 0) AS floodplain_no,
+  IFNULL(s.floodplain_unrecorded, 0) AS floodplain_unrecorded,
+  IFNULL(s.medical_shelters, 0) AS medical_shelters,
+  IFNULL(s.name_flagged_inactive, 0) AS name_flagged_inactive,
+  SAFE_CAST(p.all_dme AS INT64) AS power_dependent_dme
+FROM county_tracts AS t
+LEFT JOIN county_shelters_agg AS s USING (county_fips)
+LEFT JOIN ${power} AS p ON LPAD(CAST(p.fips_code AS STRING), 5, '0') = t.county_fips
+"""
+
+CARE_FACILITIES_PROXIMITY = """
+WITH county AS (
+  SELECT county_geom FROM ${counties} WHERE geo_id = @county_fips
+),
+cf AS (
+  SELECT
+    CAST(ccn AS STRING) AS facility_id,
+    facility_name,
+    address,
+    city,
+    state,
+    zip_code,
+    SAFE_CAST(beds AS INT64) AS certified_beds,
+    SAFE_CAST(avg_residents_per_day AS FLOAT64) AS avg_residents_per_day,
+    SAFE_CAST(latitude AS FLOAT64) AS latitude,
+    SAFE_CAST(longitude AS FLOAT64) AS longitude,
+    ST_GEOGPOINT(SAFE_CAST(longitude AS FLOAT64), SAFE_CAST(latitude AS FLOAT64)) AS g
+  FROM ${care}
+  WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+),
+inside AS (
+  SELECT cf.*
+  FROM cf
+  CROSS JOIN county
+  WHERE ST_CONTAINS(county.county_geom, cf.g)
+),
+gen_shelters AS (
+  SELECT
+    CAST(shelter_id AS STRING) AS shelter_id,
+    shelter_name,
+    IFNULL(is_medical, FALSE) AS is_medical,
+    CASE WHEN wheelchair_accessible IS TRUE THEN 'YES'
+         WHEN wheelchair_accessible IS FALSE THEN 'NO' ELSE 'UNRECORDED' END AS wheelchair_status,
+    ST_GEOGPOINT(longitude, latitude) AS g
+  FROM ${shelters}
+  WHERE generator_onsite IS TRUE
+    AND usage IN UNNEST(@pre_landfall_usage)
+    AND NOT REGEXP_CONTAINS(UPPER(IFNULL(shelter_name, '')), r'\b(INACTIVE|CLOSED|DEMOLISHED|DO NOT USE)\b')
+    AND latitude IS NOT NULL AND longitude IS NOT NULL
+)
+SELECT
+  i.facility_id,
+  i.facility_name,
+  i.address,
+  i.city,
+  i.zip_code,
+  i.certified_beds,
+  i.avg_residents_per_day,
+  i.latitude,
+  i.longitude,
+  ROUND(MIN(ST_DISTANCE(i.g, gs.g)) / 1000, 2) AS km_to_generator_recorded_shelter,
+  ROUND(MIN(IF(gs.is_medical, ST_DISTANCE(i.g, gs.g), NULL)) / 1000, 2)
+    AS km_to_medical_generator_recorded_shelter,
+  ARRAY_AGG(
+     IF(gs.shelter_id IS NOT NULL,
+        STRUCT(gs.shelter_id, gs.shelter_name, gs.is_medical, gs.wheelchair_status,
+               ROUND(ST_DISTANCE(i.g, gs.g) / 1000, 2) AS distance_km),
+        NULL)
+    IGNORE NULLS
+    ORDER BY ST_DISTANCE(i.g, gs.g)
+    LIMIT 3
+  ) AS nearest_generator_shelters
+FROM inside AS i
+LEFT JOIN gen_shelters AS gs ON ST_DWITHIN(i.g, gs.g, @car_m)
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9
+ORDER BY i.certified_beds DESC
+"""
+
+TRACTS_WITH_COUNTY_CENTROID_FALLBACK = """
+WITH county_centroids AS (
+  SELECT
+    county_fips,
+    AVG(lat) AS county_avg_lat,
+    AVG(lon) AS county_avg_lon
+  FROM ${tracts}
+  WHERE lat IS NOT NULL AND lon IS NOT NULL
+  GROUP BY county_fips
+),
+public_counties AS (
+  SELECT
+    geo_id AS county_fips,
+    ST_Y(ST_CENTROID(county_geom)) AS public_county_lat,
+    ST_X(ST_CENTROID(county_geom)) AS public_county_lon
+  FROM ${counties}
+  WHERE state_fips_code = @state_fips
+)
+SELECT
+  t.geo_id,
+  t.county_fips,
+  COALESCE(t.lat, cc.county_avg_lat, pc.public_county_lat) AS lat,
+  COALESCE(t.lon, cc.county_avg_lon, pc.public_county_lon) AS lon,
+  CASE
+    WHEN t.lat IS NOT NULL AND t.lon IS NOT NULL THEN 'TRACT_CENTROID'
+    WHEN cc.county_avg_lat IS NOT NULL AND cc.county_avg_lon IS NOT NULL THEN 'COUNTY_TRACT_AVG_FALLBACK'
+    WHEN pc.public_county_lat IS NOT NULL AND pc.public_county_lon IS NOT NULL THEN 'COUNTY_POLYGON_CENTROID_FALLBACK'
+    ELSE 'MISSING'
+  END AS coord_source,
+  t.total_pop,
+  t.households,
+  t.households_no_vehicle,
+  SAFE_DIVIDE(t.households_no_vehicle, t.households) AS share_no_vehicle,
+  t.pop_65_plus,
+  t.pct_age_65_plus,
+  t.pct_disability,
+  t.pct_mobile_homes,
+  t.mobile_homes,
+  t.group_quarters_pop,
+  t.pct_mobility,
+  t.pct_lacktrpt
+FROM ${tracts} AS t
+LEFT JOIN county_centroids AS cc USING (county_fips)
+LEFT JOIN public_counties AS pc USING (county_fips)
+WHERE t.total_pop > 0
+  AND (@county_fips = '' OR t.county_fips = @county_fips)
+ORDER BY t.households_no_vehicle DESC, t.geo_id
+LIMIT @limit
+"""
+
+SHELTER_ASSESSMENTS_BY_COUNTY = """
+SELECT
+  shelter_id,
+  shelter_name,
+  county,
+  operator_notes,
+  CASE WHEN wheelchair_unaccompanied_entries IS TRUE THEN 'YES'
+       WHEN wheelchair_unaccompanied_entries IS FALSE THEN 'NO'
+       ELSE 'UNRECORDED' END AS wheelchair_unaccompanied_status,
+  CASE WHEN ramp_unlocked_24_7 IS TRUE THEN 'YES'
+       WHEN ramp_unlocked_24_7 IS FALSE THEN 'NO'
+       ELSE 'UNRECORDED' END AS ramp_unlocked_status,
+  CASE WHEN generator_powers_medical_outlets IS TRUE THEN 'YES'
+       WHEN generator_powers_medical_outlets IS FALSE THEN 'NO'
+       ELSE 'UNRECORDED' END AS generator_medical_outlets_status,
+  wheelchair_unaccompanied_entries,
+  ramp_unlocked_24_7,
+  generator_powers_medical_outlets,
+  verified_status,
+  assessed_at
+FROM ${shelter_assessments}
+WHERE (@county = '' OR LOWER(county) = LOWER(@county))
+ORDER BY assessed_at DESC
+"""
+
+INSERT_SHELTER_ASSESSMENT = """
+INSERT INTO ${shelter_assessments} (
+  shelter_id,
+  shelter_name,
+  county,
+  operator_notes,
+  wheelchair_unaccompanied_entries,
+  ramp_unlocked_24_7,
+  generator_powers_medical_outlets,
+  verified_status,
+  assessed_at
+)
+VALUES (
+  @shelter_id,
+  @shelter_name,
+  @county,
+  @operator_notes,
+  @wheelchair_unaccompanied_entries,
+  @ramp_unlocked_24_7,
+  @generator_powers_medical_outlets,
+  @verified_status,
+  CURRENT_TIMESTAMP()
+)
+"""
+
+
+def build_deduplicated_shelters_query(project_id: str, dataset: str) -> str:
+    """Build parameterized BigQuery SQL for deduplicated county shelters."""
+    shelters_fqn = f"`{project_id}.{dataset}.shelters`"
+    return (
+        COUNTY_SHELTERS_DEDUP.replace("${shelters}", shelters_fqn)
+        .replace("${shelter_columns}", SHELTER_COLUMNS)
+    )
+
+
+def build_county_list_query(project_id: str, dataset: str) -> str:
+    """Build BigQuery SQL listing all counties with shelter, tract, and DME summaries."""
+    return (
+        LIST_COUNTIES.replace("${shelters}", f"`{project_id}.{dataset}.shelters`")
+        .replace("${tracts}", f"`{project_id}.{dataset}.vulnerability_tracts`")
+        .replace("${power}", f"`{project_id}.{dataset}.power_dependent_counties`")
+    )
+
+
+def build_county_summary_query(project_id: str, dataset: str) -> str:
+    """Build parameterized BigQuery SQL for a single county readiness summary."""
+    return (
+        COUNTY_SUMMARY.replace("${shelters}", f"`{project_id}.{dataset}.shelters`")
+        .replace("${tracts}", f"`{project_id}.{dataset}.vulnerability_tracts`")
+        .replace("${power}", f"`{project_id}.{dataset}.power_dependent_counties`")
+    )
+
+
+def build_care_facilities_proximity_query(
+    project_id: str,
+    dataset: str,
+    counties_table: str = "bigquery-public-data.geo_us_boundaries.counties",
+) -> str:
+    """Build parameterized BigQuery SQL for nursing homes with nearest generator shelter distances."""
+    return (
+        CARE_FACILITIES_PROXIMITY.replace("${care}", f"`{project_id}.{dataset}.care_facilities`")
+        .replace("${shelters}", f"`{project_id}.{dataset}.shelters`")
+        .replace("${counties}", f"`{counties_table}`")
+    )
+
+
+def build_vulnerable_tracts_fallback_query(
+    project_id: str,
+    dataset: str,
+    counties_table: str = "bigquery-public-data.geo_us_boundaries.counties",
+) -> str:
+    """Build parameterized BigQuery SQL for tracts with county-centroid fallback when lat/lon is NULL."""
+    return (
+        TRACTS_WITH_COUNTY_CENTROID_FALLBACK.replace(
+            "${tracts}", f"`{project_id}.{dataset}.vulnerability_tracts`"
+        ).replace("${counties}", f"`{counties_table}`")
+    )
+
+
+def build_shelter_assessments_query(project_id: str, dataset: str) -> str:
+    """Build parameterized BigQuery SQL to fetch operator field assessments."""
+    return SHELTER_ASSESSMENTS_BY_COUNTY.replace(
+        "${shelter_assessments}", f"`{project_id}.{dataset}.shelter_assessments`"
+    )
+
+
+def build_map_layer_queries(
+    project_id: str,
+    dataset: str,
+    counties_table: str = "bigquery-public-data.geo_us_boundaries.counties",
+) -> dict[str, str]:
+    """Return parameterized BigQuery SQL strings for shelters, tracts, and care facilities map layers."""
+    return {
+        "shelters": build_deduplicated_shelters_query(project_id, dataset),
+        "tracts": build_vulnerable_tracts_fallback_query(project_id, dataset, counties_table),
+        "care_facilities": build_care_facilities_proximity_query(project_id, dataset, counties_table),
+    }
+

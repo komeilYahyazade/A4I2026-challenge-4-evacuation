@@ -32,6 +32,11 @@ from .verify import verify_shelters
 
 logger = logging.getLogger(__name__)
 
+# Not registered, on purpose: verify_shelter_on_google_maps, audit_county_shelters_with_live_maps,
+# build_live_county_readiness_brief, submit_shelter_operator_assessment and ask_evacuation_agent in
+# tools.py. They call Google Maps outside verify.py's budget and cap, loop Maps calls over whole
+# counties, write to BigQuery, or nest a second model call. All of that would be reachable from
+# anonymous public chat. Use verify_shelters and build_readiness_brief instead.
 FUNCTION_TOOLS = [
     find_county,
     county_overview,
@@ -115,8 +120,10 @@ def bigquery_mcp_toolset(cfg: AgentConfig) -> list[Any]:
     if not cfg.bigquery_mcp_enabled:
         return []
     params = StreamableHTTPConnectionParams(url=cfg.bigquery_mcp_url)
+    # The server's full tool list is ~630 KB of schema (get_job and cancel_job are ~235 KB each),
+    # which exhausts the per-minute token quota on every model call. Keep the two we need.
     return [McpToolset(connection_params=params, header_provider=_access_token_provider(cfg.project_id),
-                       tool_name_prefix="bigquery")]
+                       tool_name_prefix="bigquery", tool_filter=["list_table_ids", "execute_sql_readonly"])]
 
 
 def mcp_toolsets(cfg: AgentConfig) -> list[Any]:
@@ -133,9 +140,42 @@ def mcp_toolsets(cfg: AgentConfig) -> list[Any]:
     return toolsets
 
 
+def instruction_for(cfg: AgentConfig) -> str:
+    """The system instruction plus where the data lives, so the BigQuery tools are not guessing."""
+    if not cfg.project_id:
+        return SYSTEM_INSTRUCTION
+    ops = f"{cfg.project_id}.{cfg.ops_dataset}"
+    return SYSTEM_INSTRUCTION + (
+        f"\nWHERE THE DATA LIVES\n- BigQuery project: {cfg.project_id}. Use this project id for every "
+        f"bigquery tool call, and write fully qualified names in SQL.\n"
+        f"- Query the views in {cfg.ops_dataset}, never the raw source tables, for shelters and tracts. "
+        f"They already apply the rules in this instruction: flags as YES, NO or UNRECORDED, blank or "
+        f"negative capacity as unrecorded, and FEMA names that say INACTIVE. "
+        f"Shelters: `{ops}.v_shelter_evidence`, one row per shelter. "
+        f"Per-county shelter counts: `{ops}.v_county_shelter_summary`. "
+        f"Tracts: `{ops}.v_tract_need`. "
+        f"Tract to nearest pre-landfall shelters: `{ops}.v_tract_shelter_candidates`. "
+        f"Shelter flood exposure, approximate: `{ops}.v_shelter_site_hazard`.\n"
+        f"- The raw source tables in {cfg.dataset} are only for what no view carries: care_facilities, "
+        f"power_dependent_counties and hazard_tracts. Their boolean flags are NULL when nobody recorded "
+        f"them; count NULL as unrecorded, never as no.\n"
+        f"- Default county: FIPS {cfg.default_county_fips}. When the manager says my county, my shelters, "
+        f"here, or names no county, use this one without asking.\n"
+    )
+
+
+def tool_error_to_result(tool: Any, args: dict[str, Any], tool_context: Any, error: Exception) -> dict[str, Any]:
+    """Hand a failed tool call back to the model as a result, so it can correct itself instead of the turn ending."""
+    name = getattr(tool, "name", "tool")
+    logger.warning("tool %s failed: %s", name, error)
+    return {"status": "error", "error": f"{type(error).__name__}: {error}",
+            "hint": "Check the arguments against the tool description and try again, or tell the manager what failed."}
+
+
 def build_root_agent(cfg: AgentConfig | None = None) -> Agent:
     cfg = cfg or AgentConfig.from_env()
     tools: list[Any] = [*FUNCTION_TOOLS, *mcp_toolsets(cfg)]
+    instruction = instruction_for(cfg)
     description = (
         "Pre-season evacuation readiness analyst: federal records in BigQuery, checked live against "
         "Google Maps, honest about what nobody recorded."
@@ -145,8 +185,9 @@ def build_root_agent(cfg: AgentConfig | None = None) -> Agent:
             name="readiness_agent",
             model=cfg.model_name,
             description=description,
-            instruction=SYSTEM_INSTRUCTION,
+            instruction=instruction,
             tools=[maps_grounding, *tools],
+            on_tool_error_callback=tool_error_to_result,
         )
     maps_agent = Agent(
         name="maps_checker",
@@ -162,8 +203,9 @@ def build_root_agent(cfg: AgentConfig | None = None) -> Agent:
         name="readiness_agent",
         model=cfg.model_name,
         description=description,
-        instruction=SYSTEM_INSTRUCTION,
+        instruction=instruction,
         tools=[AgentTool(agent=maps_agent), *tools],
+        on_tool_error_callback=tool_error_to_result,
     )
 
 

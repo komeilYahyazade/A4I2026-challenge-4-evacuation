@@ -59,3 +59,16 @@ def test_rehearse_tool_never_calls_maps(monkeypatch):
     monkeypatch.setattr(reh, "fetch_storm", lambda cfg, sid: [])
     out = asyncio.run(reh.rehearse("12071"))
     assert out["maps_used"] is False and [d["shelter_id"] for d in out["shelters_down"]] == ["B"]
+
+
+def test_rehearse_tool_path_is_compact():
+    from agent.contract import validate
+    from agent.rehearse import compact_rehearsal
+
+    edges = [edge("T1", "A", 1.0, cap=30), edge("T1", "B", 5.0, cap=20)]
+    out = rehearse_from([tract("T1", hh=20)], edges, pick_shelters_down(edges, None, explicit=["A"]),
+                        dict(SC, cone={"type": "Polygon", "coordinates": []}), county_fips="12071")
+    small = compact_rehearsal(out, {"county_fips": "12071"})
+    assert small["compact"] and "cone" not in small["scenario"] and small["before"]["assignments"] == []
+    assert small["diff"]["reassigned_total"] == len(out["diff"]["reassigned"]) and small["maps_used"] is False
+    validate(small)

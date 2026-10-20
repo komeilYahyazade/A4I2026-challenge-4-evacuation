@@ -15,7 +15,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-CONTRACT_VERSION = "1.3"
+CONTRACT_VERSION = "1.5"
 SCHEMA_VERSION = 1
 
 ThreeState = Literal["YES", "NO", "UNRECORDED"]
@@ -81,7 +81,7 @@ class ExcludedShelter(_Closed):
     shelter_id: str
     name: Optional[str]
     reason: Literal["DOWN", "NOT_PRE_LANDFALL", "NAME_SAYS_INACTIVE", "CAPACITY_UNRECORDED", "CAPACITY_IMPLAUSIBLE",
-                    "IN_SURGE_ZONE"]
+                    "IN_SURGE_ZONE", "DUPLICATE_RECORD"]
 
 
 class AllocationParams(_Closed):
@@ -175,8 +175,22 @@ class SiteOption(Fix):
     tracts_covered: list[str]
 
 
+class FullRef(_Closed):
+    method: Literal["POST", "GET"]
+    path: str
+    body: dict[str, Any]
+
+
 class AllocationV1(Payload):
+    """compact=true is the chat-tool view: tracts/shelters/assignments are empty and gaps are the top
+    ones by severity; fetch `full` for the map layers."""
+
     payload_type: Literal["allocation.v1"]
+    compact: bool = False
+    full: Optional[FullRef] = None
+    gaps_total: Optional[int] = None
+    gap_counts: Optional[dict[str, int]] = None
+    excluded_counts: Optional[dict[str, int]] = None
     county_fips: str
     generated_at: str
     solver: Literal["ortools.SimpleMinCostFlow"]
@@ -247,6 +261,7 @@ class NewlyUnassigned(_Closed):
 
 class RehearsalDiff(_Closed):
     reassigned: list[Reassigned]
+    reassigned_total: Optional[int] = None
     newly_unassigned: list[NewlyUnassigned]
     unassigned_before: int
     unassigned_after: int
@@ -255,6 +270,8 @@ class RehearsalDiff(_Closed):
 
 class RehearsalV1(Payload):
     payload_type: Literal["rehearsal.v1"]
+    compact: bool = False
+    full: Optional[FullRef] = None
     county_fips: str
     generated_at: str
     scenario: Scenario
@@ -317,12 +334,24 @@ class MapShelter(_Open):
     is_medical: bool
 
 
+class MapCareFacility(_Open):
+    facility_id: str
+    facility_name: Optional[str] = None
+    city: Optional[str] = None
+    certified_beds: Optional[float] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    km_to_generator_recorded_shelter: Optional[float] = None
+    km_to_medical_generator_recorded_shelter: Optional[float] = None
+
+
 class CountyMapV1(Payload):
     payload_type: Literal["county_map.v1"]
     county_fips: str
     county: County
     tracts: list[MapTract]
     shelters: list[MapShelter]
+    care_facilities: list[MapCareFacility] = []
 
 
 # ---------------------------------------------------------------- komeil-d2 payloads (loose)

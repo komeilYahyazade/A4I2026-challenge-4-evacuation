@@ -18,7 +18,35 @@ from typing import Any, Optional
 from .allocate import ops_table
 from .config import AgentConfig
 
-MAPS_KEYS = frozenset({"sources", "maps_sources", "supports", "current_name", "place_type", "notes", "live_name"})
+MAPS_KEYS = frozenset({
+    "sources",
+    "maps_sources",
+    "supports",
+    "grounding_supports",
+    "current_name",
+    "verified_name",
+    "verified_address",
+    "business_status",
+    "place_type",
+    "notes",
+    "live_name",
+    "live",
+    "live_google_maps",
+    "wheelchair_entrance",
+    "wheelchair_accessible_entrance",
+    "wheelchair_accessible_parking",
+    "wheelchair_accessible_restroom",
+    "drive_minutes",
+    "road_km",
+    "drive_basis",
+    "closed",
+    "confirmed_open",
+    "exists",
+    "attribution",
+    "attribution_html",
+    "maps_attribution_html",
+    "google_maps_uri",
+})
 
 NEXT_VERSION_SQL = "SELECT IFNULL(MAX(version), 0) + 1 AS v FROM ${plans} WHERE county_fips = @county_fips"
 
@@ -53,10 +81,18 @@ INSERT INTO ${log} (ts, actor, action, detail)
 VALUES (CURRENT_TIMESTAMP(), @actor, @action, PARSE_JSON(@detail))
 """
 
+# MERGE on (shelter_id, place_id): a repeat check refreshes verdict and time instead of adding a row.
 PLACE_ID_SQL = """
-INSERT INTO ${place_ids} (shelter_id, place_id, verified_at, verdict)
-SELECT r.shelter_id, r.place_id, CAST(r.verified_at AS TIMESTAMP), r.verdict
-FROM UNNEST(@rows) AS r
+MERGE ${place_ids} AS t
+USING (
+  SELECT r.shelter_id, r.place_id, CAST(r.verified_at AS TIMESTAMP) AS verified_at, r.verdict
+  FROM UNNEST(@rows) AS r
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY r.shelter_id, r.place_id ORDER BY r.verified_at DESC) = 1
+) AS s
+ON t.shelter_id = s.shelter_id AND t.place_id = s.place_id
+WHEN MATCHED THEN UPDATE SET verified_at = s.verified_at, verdict = s.verdict
+WHEN NOT MATCHED THEN INSERT (shelter_id, place_id, verified_at, verdict)
+  VALUES (s.shelter_id, s.place_id, s.verified_at, s.verdict)
 """
 
 
@@ -70,6 +106,8 @@ def strip_maps(obj: Any) -> Any:
         out = {}
         for k, v in obj.items():
             if k in MAPS_KEYS or _is_maps_uri(v):
+                continue
+            if k == "accessibility" and isinstance(v, dict) and v.get("label") == "VERIFIED LIVE":
                 continue
             out[k] = strip_maps(v)
         return out

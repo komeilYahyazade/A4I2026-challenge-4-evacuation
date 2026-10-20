@@ -1,76 +1,72 @@
-import { useState } from "react";
-import { useStore, type LayerKey } from "../store";
-import { ACCESS, GAP_RED, MODE_COLOR, TRACT_MUST, TRACT_TOP } from "../theme";
+import { useState, type ReactNode } from "react";
 
-const LAYERS: [LayerKey, string][] = [
-  ["tracts", "Tracts (need)"],
-  ["shelters", "Shelters"],
-  ["lines", "Assignments"],
-  ["gaps", "Gaps to fix"],
-  ["storm", "Storm (Ian replay)"],
-];
+export type LegendKey =
+  | "tractNeed"
+  | "tractRank"
+  | "tractMust"
+  | "nursing"
+  | "confirmed"
+  | "renamed"
+  | "conflict"
+  | "dropped"
+  | "offline"
+  | "recYes"
+  | "recNo"
+  | "unrec"
+  | "inactive"
+  | "context"
+  | "line"
+  | "reassigned"
+  | "oldRun"
+  | "cone"
+  | "track"
+  | "fix"
+  | "site"
+  | "unassigned";
 
-export function Legend() {
-  const { s, d } = useStore();
-  const [open, setOpen] = useState(false);
+const ITEMS: Record<LegendKey, [ReactNode, string]> = {
+  tractNeed: [<span className="lg-circle lg-tract" />, "Neighbourhood; size = households without a car"],
+  tractRank: [<span className="m-rank lg-small">1</span>, "Top-ranked neighbourhood (number = rank)"],
+  tractMust: [<span className="lg-circle lg-must" />, "Must leave, may need help"],
+  nursing: [<span className="m-nursing lg-small">+</span>, "Nursing home (CMS)"],
+  confirmed: [<span className="m-confirmed lg-small"><span>✓</span></span>, "Confirmed on Google Maps"],
+  renamed: [<span className="m-renamed lg-small"><span>↻</span></span>, "Confirmed, now under another name"],
+  conflict: [<span className="m-conflict lg-small"><span>!</span></span>, "Checked, still unconfirmed"],
+  dropped: [<span className="m-dropped lg-small"><span>✕</span></span>, "Dropped after the live check"],
+  offline: [<span className="m-offline lg-small"><span>✕</span></span>, "Offline in the rehearsal"],
+  recYes: [<span className="m-recYes" />, "Wheelchair access recorded yes"],
+  recNo: [<span className="m-recNo" />, "Wheelchair access recorded no"],
+  unrec: [<span className="m-unrec" />, "Wheelchair access not recorded (not NO)"],
+  inactive: [<span className="m-tag lg-tag">INACTIVE</span>, "FEMA's own name says inactive"],
+  context: [<span className="m-dot m-context" />, "Other shelters"],
+  line: [<span className="lg-line lg-accent" />, "Planned pickup run (hover a card to highlight)"],
+  reassigned: [<span className="lg-line lg-warn" />, "Run re-routed in the rehearsal"],
+  oldRun: [<span className="lg-line lg-dashed" />, "Run it replaces"],
+  cone: [<span className="lg-cone" />, "NHC forecast cone"],
+  track: [<span className="lg-line lg-text" />, "Forecast track"],
+  fix: [<span className="m-fix sev-high lg-small">▲</span>, "High-priority fix (select any fix to pin it)"],
+  site: [<span className="m-site lg-small">★</span>, "Where one new site seats the most people"],
+  unassigned: [<span className="lg-circle lg-danger" />, "People with no shelter seat within 15 km"],
+};
+
+/** Lists exactly the symbols on the map right now. */
+export function Legend({ keys }: { keys: LegendKey[] }) {
+  const [open, setOpen] = useState(true);
+  if (!keys.length) return null;
   return (
-    <div className={`legend ${open ? "" : "closed"}`}>
-      <button className="legend-toggle" onClick={() => setOpen(!open)}>
-        {open ? "Hide legend" : "Legend and layers"}
+    <div className={`legend ${open ? "" : "closed"}`} aria-label="Map legend">
+      <button className="legend-toggle" onClick={() => setOpen(!open)} aria-expanded={open}>
+        {open ? "Legend ▾" : "Legend ▸"}
       </button>
-      {!open && (
-        <div className="mini-key">
-          {Object.entries(ACCESS).map(([k, v]) => (
-            <span key={k} title={v.text}>
-              <span className="swatch" style={{ background: v.color }}>
-                {v.glyph}
-              </span>
-              {k === "NOBODY_KNOWS" ? "UNRECORDED" : k.replace("_", " ").toLowerCase()}
-            </span>
-          ))}
-        </div>
-      )}
       {open && (
-        <>
-          <div className="legend-sec">
-            <div className="legend-title">Pin fill: wheelchair evidence</div>
-            {Object.entries(ACCESS).map(([k, v]) => (
-              <div key={k} className="legend-row">
-                <span className="swatch" style={{ background: v.color }}>
-                  {v.glyph}
-                </span>
-                {v.text}
-              </div>
-            ))}
-          </div>
-          <div className="legend-sec">
-            <div className="legend-title">Pin ring: building checked live?</div>
-            <div className="legend-row"><span className="ring ring-live" /> Confirmed on Google Maps</div>
-            <div className="legend-row"><span className="ring ring-renamed" /> Confirmed, renamed</div>
-            <div className="legend-row"><span className="ring ring-conflict" /> Live problem</div>
-            <div className="legend-row"><span className="ring ring-dropped" /> Dropped (not found / closed)</div>
-            <div className="legend-row"><span className="ring ring-fema" /> FEMA record only</div>
-            <div className="legend-row"><span className="ring ring-post" /> Square: post-impact only</div>
-          </div>
-          <div className="legend-sec">
-            <div className="legend-title">Lines and areas</div>
-            <div className="legend-row"><span className="line" style={{ background: MODE_COLOR.PARATRANSIT }} /> Para-transit assignment</div>
-            <div className="legend-row"><span className="line" style={{ background: MODE_COLOR.WALK }} /> Walkable (≤ 1.5 km)</div>
-            <div className="legend-row"><span className="line" style={{ background: "#ff6f00" }} /> Reassigned in rehearsal</div>
-            <div className="legend-row"><span className="dot" style={{ background: TRACT_TOP }} /> Can't drive: top tracts by car-less households</div>
-            <div className="legend-row"><span className="dot" style={{ background: TRACT_MUST }} /> Must leave, may need help</div>
-            <div className="legend-row"><span className="dot" style={{ background: "#ffb300" }} /> ★ One designated site would seat these</div>
-            <div className="legend-row"><span className="dot" style={{ background: GAP_RED }} /> Gap to fix before the season</div>
-          </div>
-          <div className="legend-sec">
-            <div className="legend-title">Layers</div>
-            {LAYERS.map(([k, label]) => (
-              <label key={k} className="legend-row">
-                <input type="checkbox" checked={s.layers[k]} onChange={(e) => d({ type: "layer", key: k, on: e.target.checked })} /> {label}
-              </label>
-            ))}
-          </div>
-        </>
+        <ul>
+          {keys.map((k) => (
+            <li key={k}>
+              <span className="lg-sym">{ITEMS[k][0]}</span>
+              {ITEMS[k][1]}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

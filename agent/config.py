@@ -63,6 +63,9 @@ class AgentConfig:
     verify_max: int = 8
     verify_concurrency: int = 5
     verify_timeout_s: float = 45.0
+    maps_budget_per_hour: int = 0  # 0 = unlimited. Set on any public deployment.
+    voice_model: str = "gemini-3.8-live"
+    voice_location: str = "us-central1"  # Gemini Live is regional; text and Maps grounding stay global
 
     def __post_init__(self) -> None:
         if self.project_id and not _PROJECT_RE.match(self.project_id):
@@ -100,6 +103,9 @@ class AgentConfig:
             verify_max=int(src.get("VERIFY_MAX", "8")),
             verify_concurrency=int(src.get("VERIFY_CONCURRENCY", "5")),
             verify_timeout_s=float(src.get("VERIFY_TIMEOUT_S", "45")),
+            maps_budget_per_hour=int(src.get("MAPS_BUDGET_PER_HOUR", "0")),
+            voice_model=src.get("VOICE_MODEL", "gemini-3.8-live").strip(),
+            voice_location=src.get("VOICE_LOCATION", "us-central1").strip(),
         )
 
     def table(self, name: str) -> str:

@@ -1,6 +1,7 @@
 // ADK chat over /run_sse (contract §A1). Events are camelCase, one `data: <json>` per event.
 import { CONFIG } from "../config";
 import type { AdkEvent } from "../contract";
+import { friendlyHttp } from "./rest";
 
 export async function createSession(state: Record<string, unknown> = {}): Promise<string> {
   const res = await fetch(`${CONFIG.agentUrl}/apps/${CONFIG.app}/users/${encodeURIComponent(CONFIG.userId)}/sessions`, {
@@ -8,7 +9,7 @@ export async function createSession(state: Record<string, unknown> = {}): Promis
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ state }),
   });
-  if (!res.ok) throw new Error(`Could not create session: HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
+  if (!res.ok) throw new Error(`Could not start a chat session: ${friendlyHttp(res, `HTTP ${res.status} ${(await res.text()).slice(0, 200)}`)}`);
   const s = (await res.json()) as { id: string };
   return s.id;
 }
@@ -27,7 +28,7 @@ export async function* runSse(sessionId: string, text: string, signal?: AbortSig
     }),
     signal,
   });
-  if (!res.ok || !res.body) throw new Error(`run_sse failed: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`);
+  if (!res.ok || !res.body) throw new Error(res.status === 404 ? `run_sse failed: HTTP 404` : friendlyHttp(res, `run_sse failed: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`));
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();

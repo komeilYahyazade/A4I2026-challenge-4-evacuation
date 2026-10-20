@@ -33,7 +33,10 @@ export function MapsAttribution({ sources, lead = "Source", fallbackTitle }: { s
 /** Address-only results arrive titled " - Google Maps"; keep the place part, else the shelter name. */
 export function cleanTitle(title?: string | null, fallback?: string): string {
   const t = (title || "").replace(/\s*-\s*Google Maps\s*$/i, "").trim();
-  return t || fallback || "Place";
+  if (!t || /^google maps place$/i.test(t)) return fallback || "Place";
+  // Route chunks are titled with coordinates; never use coordinates as link text.
+  if (/^\(?\s*-?\d+\.\d+\s*,\s*-?\d+\.\d+/.test(t)) return fallback ? `Route to ${fallback}` : "Route";
+  return t;
 }
 
 /** Wrap every literal "Google Maps" in agent or tool text so it is never translated or wrapped. */

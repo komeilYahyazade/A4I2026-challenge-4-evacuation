@@ -10,6 +10,9 @@ interface RuntimeConfig {
   MAPS_API_KEY?: string;
   MAP_ID?: string;
   USER_ID?: string;
+  PUBLIC_DEMO?: boolean;
+  VOICE_ENABLED?: boolean;
+  VOICE_PUBLIC?: boolean;
 }
 
 declare global {
@@ -34,6 +37,11 @@ export const CONFIG = {
   mapId: pick(rt.MAP_ID, env.VITE_MAP_ID as string | undefined, "DEMO_MAP_ID"),
   userId: pick(rt.USER_ID, undefined, "em-lee"),
   countyFips: "12071",
+  // Public deployment: plan drafting and approval are refused by server.mjs, so the UI disables them.
+  publicDemo: rt.PUBLIC_DEMO === true,
+  // Voice (Gemini Live via /run_live) is behind a flag; on the public site it also needs VOICE_PUBLIC.
+  voiceEnabled: rt.VOICE_ENABLED === true || (rt.VOICE_ENABLED === undefined && env.VITE_VOICE_ENABLED === "1"),
+  voicePublic: rt.VOICE_PUBLIC === true,
 };
 
 export const MOCK_ONLY = pick(rt.MODE, env.VITE_MODE as string | undefined).toLowerCase() === "mock";

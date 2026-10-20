@@ -69,6 +69,8 @@ export function existenceOf(row: Pick<WhereRow, "live" | "verdict" | "flags" | "
   if (row.verdict === "DROP") return "DROPPED";
   if (!live || live.status !== "VERIFIED" || !(live.sources || []).length) return "FEMA_ONLY";
   const flags = row.flags || [];
+  // A live answer that still leaves the record unconfirmed (e.g. FEMA's own name says INACTIVE).
+  if (row.verdict === "KEEP_UNVERIFIED") return "CONFLICT";
   if (flags.includes("TEMPORARILY_CLOSED") || live.closed === "temporarily") return "CONFLICT";
   const recName = row.name || row.shelter_name;
   if (

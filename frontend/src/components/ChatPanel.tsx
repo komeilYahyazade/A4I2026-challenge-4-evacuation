@@ -18,7 +18,10 @@ export function ChatPanel() {
   const [text, setText] = useState("");
   const session = useRef<string | null>(null);
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => end.current?.scrollIntoView({ behavior: "smooth" }), [s.chat.length]);
+  // Braces matter: newer browsers return a Promise from scrollIntoView, and React would call it as a cleanup.
+  useEffect(() => {
+    end.current?.scrollIntoView({ behavior: "smooth" });
+  }, [s.chat.length]);
 
   const send = (t: string) => {
     const v = t.trim();
@@ -36,7 +39,7 @@ export function ChatPanel() {
             {MOCK_ONLY && <p className="mock-note">Mock mode: chat needs the live agent, and the panels show MOCK data.</p>}
             <div className="suggestions">
               {SUGGESTIONS.map((q) => (
-                <button key={q} className="chip" onClick={() => send(q)}>
+                <button key={q} className="suggest" onClick={() => send(q)}>
                   {q}
                 </button>
               ))}
@@ -96,7 +99,7 @@ function Markdown({ text }: { text: string }) {
   const flush = () => {
     if (!list) return;
     const L = list;
-    out.push(L.ordered ? <ol key={out.length}>{L.items}</ol> : <ul key={out.length}>{L.items}</ul>);
+    out.push(L.ordered ? <ol key={`l${out.length}`}>{L.items}</ol> : <ul key={`l${out.length}`}>{L.items}</ul>);
     list = null;
   };
   lines.forEach((raw, i) => {
@@ -114,8 +117,8 @@ function Markdown({ text }: { text: string }) {
       return;
     }
     flush();
-    if (head) out.push(<h4 key={i}>{inline(head[2])}</h4>);
-    else if (line.trim()) out.push(<p key={i}>{inline(line)}</p>);
+    if (head) out.push(<h4 key={`h${i}`}>{inline(head[2])}</h4>);
+    else if (line.trim()) out.push(<p key={`p${i}`}>{inline(line)}</p>);
   });
   flush();
   return <>{out}</>;

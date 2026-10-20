@@ -176,3 +176,39 @@ def test_an_ordinary_rename_is_still_kept():
     r = decide(shelter(shelter_name="First Presbyterian Church of Maitland"),
                raw(answer(current_name="Maitland Presbyterian Church")))
     assert r["verdict"] == "KEEP" and "SUCCESSOR_AT_ADDRESS" not in r["flags"]
+
+
+def test_hourly_maps_budget_caps_live_calls_and_labels_the_rest():
+    import asyncio
+    from unittest import mock
+
+    from agent import verify
+
+    calls = []
+
+    async def fake_ground(row, origin, cfg):
+        calls.append(row["shelter_id"])
+        return raw(answer())
+
+    verify._recent_calls.clear()
+    rows = [shelter(shelter_id=str(i)) for i in range(5)]
+    cfg = CFG.__class__(project_id="demo-project", verify_max=8, maps_budget_per_hour=3)
+    with mock.patch.object(verify, "ground_one", fake_ground):
+        results, led = asyncio.run(verify.verify_rows(rows, {}, cfg))
+        again, led2 = asyncio.run(verify.verify_rows(rows[:1], {}, cfg))
+    verify._recent_calls.clear()
+    assert len(calls) == 3 and led["maps_calls"] == 3 and led["skipped_budget"] == 2
+    skipped = [r for r in results if r["live"]["status"] == "SKIPPED_BUDGET"]
+    assert len(skipped) == 2 and all(r["verdict"] == "KEEP_UNVERIFIED" and r["live"]["label"] == "UNRECORDED" for r in skipped)
+    assert led2["maps_calls"] == 0 and led2["skipped_budget"] == 1
+
+
+def test_budget_window_rolls_over():
+    from agent.verify import _recent_calls, take_budget
+
+    _recent_calls.clear()
+    assert take_budget(5, 2, now=1000.0) == 2
+    assert take_budget(1, 2, now=2000.0) == 0
+    assert take_budget(1, 2, now=4700.0) == 1  # first two are over an hour old
+    assert take_budget(9, 0) == 9  # 0 means unlimited
+    _recent_calls.clear()

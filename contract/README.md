@@ -1,4 +1,4 @@
-# System contract, v1.3 (FROZEN at v1.0 12:00 EDT; additive changes only)
+# System contract, v1.5 (FROZEN at v1.0 12:00 EDT; additive changes only)
 
 **Owner:** agent lane. To change anything, send `CONTRACT-CHANGE:`; the owner bumps the version and
 broadcasts `CONTRACT vX.Y published`. v1.0 froze at 12:00 EDT. From now on changes are additive only: new optional
@@ -26,6 +26,19 @@ readiness-agent = agent/server.py: ADK get_fast_api_app (APP "agent") + /api/* +
 
 - **Sessions** are in memory (`use_local_storage=False`), because session events can hold Google Maps content. The service runs with
   `--max-instances 1` so a session never moves between instances.
+- **Access tiers (v1.5).** The caller's verified identity decides the tier. Cloud Run verifies the ID token, and the agent reads its
+  `email` claim (confirmed: Cloud Run forwards Authorization to the container).
+  - **PUBLIC** when: the email is `PUBLIC_CALLER_SA` (readiness-web's proxy, i.e. anyone on the public demo); or there is no token,
+    an undecodable one, or one without an email claim (fails closed); or the request carries `x-readiness-public: 1`. That header
+    can only add restriction.
+  - **SIGNED-IN** is any other email, e.g. a person through the localhost dev proxy.
+  - Public callers: no BigQuery writes (`place_ids_stored: 0`; `/api/plans` writes get 403), at most 2 Maps checks per
+    `/api/verify` (the rest go to `skipped_over_limit`), and `/api/brief` runs with Maps off when the cap is below VERIFY_MAX.
+  - Everyone: VERIFY_MAX=4 per check, and MAPS_BUDGET_PER_HOUR=120 grounded verify calls per rolling hour across the process.
+  - `GET /api/health` adds `caller: "public"|"signed_in"`, and `caller_email` for signed-in callers only. `/api/brief` adds `verify_limit`.
+  - `shelter_place_ids` writes are a MERGE on (shelter_id, place_id), so repeats refresh the row instead of adding one.
+  - The deploy refuses `BIGQUERY_MCP_ENABLED=true`: its execute_sql plus the SA's WRITER on readiness_ops would put DML within reach of
+    anonymous chat. The Toolbox is fine, because its tools are fixed read-only SQL.
 - **Agent auth.** The agent stays private. The frontend server mints a Google ID token with
   audience = agent URL and proxies `/agent/<path>` → `<AGENT_URL>/<path>`. The frontend's runtime
   service account needs `roles/run.invoker` on `readiness-agent`; the agent lane grants it once you send
@@ -52,6 +65,11 @@ readiness-agent = agent/server.py: ADK get_fast_api_app (APP "agent") + /api/* +
   A missing `startIndex` means 0.
 - `streaming:false` gives whole events, no partials.
 - **Errors** arrive in the stream as `data: {"error": "<Type>: <msg>", "error_details": {...}}`, after which the stream ends.
+- **Compact tool payloads (v1.4):** in chat, `allocate_county` and `rehearse` return their payload_type with `compact: true`
+  and `full: {method, path, body}`. In that view tracts, shelters and assignments are empty (in rehearsal, before and after are compact
+  and the cone is dropped); gaps are the top 12 by severity, with `gaps_total`, `gap_counts` and `excluded_counts`. The map
+  calls `full` (the /api route) for its layers. Why: a grounded request has a 32,768-token input cap, and a full Lee allocation is
+  about 220 KB (rehearsal about 465 KB). Compact is 14 KB and 31 KB. The /api routes always return the full payload.
 - **Tool results:** every function tool returns a dict, so `functionResponse.response` IS the payload, with
   `response.payload_type` at the top. Unknown payload types are ignored.
 - **Deployed capture:** `contract/fixtures/run_sse.sample.txt` comes from readiness-agent revision 2 on Cloud Run:
@@ -238,6 +256,8 @@ best_track[] {lat, lng, valid_at, wind_kt}   (what actually happened; NHC best t
 - Every JSON fixture must validate (`tests/test_contract.py`).
 
 ## Changelog
+- **v1.5 (12:45):** identity-based access tiers, public limits, MERGE for place_ids, health caller fields. Revision readiness-agent-00006-p92.
+- **v1.4 (12:20):** compact chat payloads for allocate_county and rehearse (compact, full, gaps_total, gap_counts, excluded_counts, reassigned_total).
 - **v1.3 (12:08):** plans routes (draft, approve, list) and decision_log; place_ids_stored; SUCCESSOR_AT_ADDRESS and NAME_SAYS_INACTIVE flags; in-memory sessions with max 1 instance. Serving on revision readiness-agent-00004-cmz.
 - **v1.2 (12:00):** allocation.v1 site_options[] (Allocator part 2) and a county headline gap; /api/health; the deployed SSE capture; the verify capture redacted.
 - **v1.1 (12:05):** APPROXIMATE label; NAME_SAYS_INACTIVE exclusion in brief and allocation; site_hazard and the flood-exposed-site fix.

@@ -17,8 +17,10 @@ RUN pip install --no-cache-dir uv \
  && uv pip install --system --no-cache -r requirements.txt \
  && useradd --create-home --uid 10001 app
 
-# The ADK agent loader treats every folder under AGENTS_DIR as an app, so only the agent goes there.
+# The ADK agent loader treats every folder under AGENTS_DIR as an app: only agent/ and voice/ go there.
 COPY agent/ ./agents/agent/
+# Voice (Gemini Live) is a second ADK app beside the text agent; /run_live?app_name=voice reaches it.
+COPY voice/ ./agents/voice/
 USER app
 WORKDIR /app/agents
 

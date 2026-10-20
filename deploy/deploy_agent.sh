@@ -10,6 +10,17 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# The image ships two ADK apps, agent/ and voice/ (Gemini Live). The Dockerfile copies both.
+[[ -f voice/__init__.py ]] || { echo "voice/ is missing (komeil-d2's Gemini Live app). Restore it, or remove the COPY voice/ line." >&2; exit 1; }
+
+# readiness-web is public and the runtime SA has WRITER on readiness_ops. The managed BigQuery MCP
+# exposes execute_sql, which would put DML within reach of anonymous chat. Never enable it here.
+# (The MCP Toolbox is fine: its tools are fixed, parameterized, read-only SQL.)
+if [[ "$(printf '%s' "${BIGQUERY_MCP_ENABLED:-false}" | tr '[:upper:]' '[:lower:]')" =~ ^(1|true|yes|on)$ ]]; then
+  echo "Refusing to deploy: BIGQUERY_MCP_ENABLED must stay unset/false on a service reachable from the public demo." >&2
+  exit 1
+fi
+
 PROJECT="${GOOGLE_CLOUD_PROJECT:-$(gcloud config get-value project 2>/dev/null)}"
 REGION="${REGION:-us-central1}"
 SERVICE="${SERVICE:-readiness-agent}"
@@ -62,6 +73,10 @@ ENV_VARS="GOOGLE_CLOUD_PROJECT=${PROJECT},GOOGLE_CLOUD_LOCATION=global,GOOGLE_GE
 ENV_VARS+=",GOOGLE_GENAI_USE_ENTERPRISE=True,ADK_MODEL=${ADK_MODEL:-gemini-3.6-flash}"
 ENV_VARS+=",BQ_DATASET=${BQ_DATASET:-evacuation_readiness},BQ_LOCATION=US,EVAC_STATE=${EVAC_STATE:-FL},EVAC_COUNTY_FIPS=${EVAC_COUNTY_FIPS:-12071}"
 ENV_VARS+=",OPS_DATASET=${OPS_DATASET:-readiness_ops},REQUIRE_MCP=${REQUIRE_MCP:-true},MCP_TOOLBOX_URL=${MCP_TOOLBOX_URL:-}"
+# Public-demo limits: grounded verify calls per rolling hour (process-wide), and shelters per check.
+ENV_VARS+=",MAPS_BUDGET_PER_HOUR=${MAPS_BUDGET_PER_HOUR:-120},VERIFY_MAX=${VERIFY_MAX:-4},BIGQUERY_MCP_ENABLED=false"
+# Voice: on for signed-in callers, off for the public demo unless VOICE_PUBLIC=1. VOICE_ENABLED=0 is the kill switch.
+ENV_VARS+=",VOICE_ENABLED=${VOICE_ENABLED:-1},VOICE_PUBLIC=${VOICE_PUBLIC:-0}"
 
 gcloud run deploy "$SERVICE" \
   --project "$PROJECT" --region "$REGION" --source . \

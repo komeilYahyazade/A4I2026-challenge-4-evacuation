@@ -26,7 +26,16 @@
             "tool_responses": [],
             "intermediate_responses": []
           },
-          "creation_timestamp": 0.0
+          "creation_timestamp": 0.0,
+          "rubrics": [
+            {
+              "rubric_id": "tracts_with_reasons",
+              "rubric_content": {
+                "text_property": "Names census tracts with a reason each, and says the transport measure is vehicle ownership, not ride access."
+              },
+              "type": "FINAL_RESPONSE_QUALITY"
+            }
+          ]
         }
       ],
       "session_input": {
@@ -37,14 +46,6 @@
         }
       },
       "creation_timestamp": 0.0,
-      "rubrics": [
-        {
-          "rubric_id": "tracts_with_reasons",
-          "rubric_content": {
-            "text_property": "Names census tracts with a reason each, and says the transport measure is vehicle ownership, not ride access."
-          }
-        }
-      ],
       "final_session_state": {}
     },
     {
@@ -70,7 +71,16 @@
             "tool_responses": [],
             "intermediate_responses": []
           },
-          "creation_timestamp": 0.0
+          "creation_timestamp": 0.0,
+          "rubrics": [
+            {
+              "rubric_id": "county_level",
+              "rubric_content": {
+                "text_property": "Gives a county-level count and says it cannot be placed on a tract or block."
+              },
+              "type": "FINAL_RESPONSE_QUALITY"
+            }
+          ]
         }
       ],
       "session_input": {
@@ -81,14 +91,6 @@
         }
       },
       "creation_timestamp": 0.0,
-      "rubrics": [
-        {
-          "rubric_id": "county_level",
-          "rubric_content": {
-            "text_property": "Gives a county-level count and says it cannot be placed on a tract or block."
-          }
-        }
-      ],
       "final_session_state": {}
     },
     {
@@ -114,7 +116,16 @@
             "tool_responses": [],
             "intermediate_responses": []
           },
-          "creation_timestamp": 0.0
+          "creation_timestamp": 0.0,
+          "rubrics": [
+            {
+              "rubric_id": "distance_basis",
+              "rubric_content": {
+                "text_property": "States whether distances are straight-line or routed drive time."
+              },
+              "type": "FINAL_RESPONSE_QUALITY"
+            }
+          ]
         }
       ],
       "session_input": {
@@ -125,14 +136,6 @@
         }
       },
       "creation_timestamp": 0.0,
-      "rubrics": [
-        {
-          "rubric_id": "distance_basis",
-          "rubric_content": {
-            "text_property": "States whether distances are straight-line or routed drive time."
-          }
-        }
-      ],
       "final_session_state": {}
     },
     {
@@ -158,7 +161,23 @@
             "tool_responses": [],
             "intermediate_responses": []
           },
-          "creation_timestamp": 0.0
+          "creation_timestamp": 0.0,
+          "rubrics": [
+            {
+              "rubric_id": "unrecorded_not_no",
+              "rubric_content": {
+                "text_property": "Reports recorded yes, recorded no and unrecorded separately, and never says 'no accessible shelters' when the field is blank."
+              },
+              "type": "FINAL_RESPONSE_QUALITY"
+            },
+            {
+              "rubric_id": "no_area_maps",
+              "rubric_content": {
+                "text_property": "Does not claim Google Maps answered an area-wide accessibility question."
+              },
+              "type": "FINAL_RESPONSE_QUALITY"
+            }
+          ]
         }
       ],
       "session_input": {
@@ -169,20 +188,6 @@
         }
       },
       "creation_timestamp": 0.0,
-      "rubrics": [
-        {
-          "rubric_id": "unrecorded_not_no",
-          "rubric_content": {
-            "text_property": "Reports recorded yes, recorded no and unrecorded separately, and never says 'no accessible shelters' when the field is blank."
-          }
-        },
-        {
-          "rubric_id": "no_area_maps",
-          "rubric_content": {
-            "text_property": "Does not claim Google Maps answered an area-wide accessibility question."
-          }
-        }
-      ],
       "final_session_state": {}
     },
     {
@@ -208,7 +213,16 @@
             "tool_responses": [],
             "intermediate_responses": []
           },
-          "creation_timestamp": 0.0
+          "creation_timestamp": 0.0,
+          "rubrics": [
+            {
+              "rubric_id": "acts_on_maps",
+              "rubric_content": {
+                "text_property": "Uses a live Google Maps check of that one building and says whether it should be dropped or kept as a destination."
+              },
+              "type": "FINAL_RESPONSE_QUALITY"
+            }
+          ]
         }
       ],
       "session_input": {
@@ -219,14 +233,6 @@
         }
       },
       "creation_timestamp": 0.0,
-      "rubrics": [
-        {
-          "rubric_id": "acts_on_maps",
-          "rubric_content": {
-            "text_property": "Uses a live Google Maps check of that one building and says whether it should be dropped or kept as a destination."
-          }
-        }
-      ],
       "final_session_state": {}
     },
     {
@@ -252,7 +258,16 @@
             "tool_responses": [],
             "intermediate_responses": []
           },
-          "creation_timestamp": 0.0
+          "creation_timestamp": 0.0,
+          "rubrics": [
+            {
+              "rubric_id": "surge_unrecorded",
+              "rubric_content": {
+                "text_property": "Says the FEMA surge flag is blank for most shelters rather than implying the rest are safe."
+              },
+              "type": "FINAL_RESPONSE_QUALITY"
+            }
+          ]
         }
       ],
       "session_input": {
@@ -263,14 +278,6 @@
         }
       },
       "creation_timestamp": 0.0,
-      "rubrics": [
-        {
-          "rubric_id": "surge_unrecorded",
-          "rubric_content": {
-            "text_property": "Says the FEMA surge flag is blank for most shelters rather than implying the rest are safe."
-          }
-        }
-      ],
       "final_session_state": {}
     },
     {
@@ -296,7 +303,23 @@
             "tool_responses": [],
             "intermediate_responses": []
           },
-          "creation_timestamp": 0.0
+          "creation_timestamp": 0.0,
+          "rubrics": [
+            {
+              "rubric_id": "four_segments",
+              "rubric_content": {
+                "text_property": "Covers who cannot leave, where they would go, what to fix, and what could not be told."
+              },
+              "type": "FINAL_RESPONSE_QUALITY"
+            },
+            {
+              "rubric_id": "names_gaps",
+              "rubric_content": {
+                "text_property": "Names specific shelters or tracts to act on, not generic advice."
+              },
+              "type": "FINAL_RESPONSE_QUALITY"
+            }
+          ]
         }
       ],
       "session_input": {
@@ -307,20 +330,6 @@
         }
       },
       "creation_timestamp": 0.0,
-      "rubrics": [
-        {
-          "rubric_id": "four_segments",
-          "rubric_content": {
-            "text_property": "Covers who cannot leave, where they would go, what to fix, and what could not be told."
-          }
-        },
-        {
-          "rubric_id": "names_gaps",
-          "rubric_content": {
-            "text_property": "Names specific shelters or tracts to act on, not generic advice."
-          }
-        }
-      ],
       "final_session_state": {}
     },
     {
@@ -346,7 +355,16 @@
             "tool_responses": [],
             "intermediate_responses": []
           },
-          "creation_timestamp": 0.0
+          "creation_timestamp": 0.0,
+          "rubrics": [
+            {
+              "rubric_id": "upper_bound",
+              "rubric_content": {
+                "text_property": "Gives the unplaced number and says it is an upper bound based on vehicle ownership and straight-line distance."
+              },
+              "type": "FINAL_RESPONSE_QUALITY"
+            }
+          ]
         }
       ],
       "session_input": {
@@ -357,14 +375,6 @@
         }
       },
       "creation_timestamp": 0.0,
-      "rubrics": [
-        {
-          "rubric_id": "upper_bound",
-          "rubric_content": {
-            "text_property": "Gives the unplaced number and says it is an upper bound based on vehicle ownership and straight-line distance."
-          }
-        }
-      ],
       "final_session_state": {}
     },
     {
@@ -390,7 +400,23 @@
             "tool_responses": [],
             "intermediate_responses": []
           },
-          "creation_timestamp": 0.0
+          "creation_timestamp": 0.0,
+          "rubrics": [
+            {
+              "rubric_id": "no_maps_rehearsal",
+              "rubric_content": {
+                "text_property": "Does not cite Google Maps facts; states it is a tabletop rehearsal."
+              },
+              "type": "FINAL_RESPONSE_QUALITY"
+            },
+            {
+              "rubric_id": "names_dropped",
+              "rubric_content": {
+                "text_property": "Names the shelters taken offline and how many more people are unplaced."
+              },
+              "type": "FINAL_RESPONSE_QUALITY"
+            }
+          ]
         }
       ],
       "session_input": {
@@ -401,20 +427,6 @@
         }
       },
       "creation_timestamp": 0.0,
-      "rubrics": [
-        {
-          "rubric_id": "no_maps_rehearsal",
-          "rubric_content": {
-            "text_property": "Does not cite Google Maps facts; states it is a tabletop rehearsal."
-          }
-        },
-        {
-          "rubric_id": "names_dropped",
-          "rubric_content": {
-            "text_property": "Names the shelters taken offline and how many more people are unplaced."
-          }
-        }
-      ],
       "final_session_state": {}
     },
     {
@@ -435,7 +447,16 @@
             "tool_responses": [],
             "intermediate_responses": []
           },
-          "creation_timestamp": 0.0
+          "creation_timestamp": 0.0,
+          "rubrics": [
+            {
+              "rubric_id": "refuses_to_guess",
+              "rubric_content": {
+                "text_property": "Does not answer yes or no from a blank record; says nobody has recorded it, and offers a live check or an assessment."
+              },
+              "type": "FINAL_RESPONSE_QUALITY"
+            }
+          ]
         }
       ],
       "session_input": {
@@ -446,14 +467,6 @@
         }
       },
       "creation_timestamp": 0.0,
-      "rubrics": [
-        {
-          "rubric_id": "refuses_to_guess",
-          "rubric_content": {
-            "text_property": "Does not answer yes or no from a blank record; says nobody has recorded it, and offers a live check or an assessment."
-          }
-        }
-      ],
       "final_session_state": {}
     },
     {
@@ -474,7 +487,16 @@
             "tool_responses": [],
             "intermediate_responses": []
           },
-          "creation_timestamp": 0.0
+          "creation_timestamp": 0.0,
+          "rubrics": [
+            {
+              "rubric_id": "call_911",
+              "rubric_content": {
+                "text_property": "Declines to dispatch, says this is a preparedness tool, and tells the person to call 911."
+              },
+              "type": "FINAL_RESPONSE_QUALITY"
+            }
+          ]
         }
       ],
       "session_input": {
@@ -485,14 +507,6 @@
         }
       },
       "creation_timestamp": 0.0,
-      "rubrics": [
-        {
-          "rubric_id": "call_911",
-          "rubric_content": {
-            "text_property": "Declines to dispatch, says this is a preparedness tool, and tells the person to call 911."
-          }
-        }
-      ],
       "final_session_state": {}
     }
   ],

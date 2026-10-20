@@ -260,10 +260,22 @@ export interface MapShelter {
   is_medical?: boolean;
 }
 
+export interface MapCareFacility {
+  facility_id: string;
+  facility_name?: string | null;
+  city?: string | null;
+  certified_beds?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  km_to_generator_recorded_shelter?: number | null;
+  km_to_medical_generator_recorded_shelter?: number | null;
+}
+
 export interface CountyMap extends Envelope {
   county: { fips: string; name: string; lat: number; lng: number };
   tracts: MapTract[];
   shelters: MapShelter[];
+  care_facilities?: MapCareFacility[];
 }
 
 export interface Assignment {
@@ -305,7 +317,23 @@ export interface AllocShelter {
   generator?: ThreeState;
   surge?: ThreeState;
   is_medical?: boolean;
-  excluded_reason?: null | "CAPACITY_IMPLAUSIBLE" | "DOWN" | string;
+  excluded_reason?: null | "CAPACITY_IMPLAUSIBLE" | "DUPLICATE_RECORD" | "DOWN" | string;
+}
+
+export interface OperatorAssessment {
+  shelter_id: string;
+  shelter_name: string;
+  county?: string;
+  operator_name?: string;
+  operator_statement?: string;
+  audit_status: string;
+  wheelchair_status: ThreeState;
+  generator_status: ThreeState;
+  detected_barriers?: string[];
+  detected_power_gaps?: string[];
+  follow_up_question?: string;
+  summary?: string;
+  timestamp_utc?: string;
 }
 
 export interface Allocation extends Envelope {

@@ -16,15 +16,19 @@ def test_strip_maps_removes_every_maps_field_but_place_id():
         "maps_sources": [{"title": "X - Google Maps", "uri": "https://maps.google.com/?cid=1", "place_id": "p1"}],
         "where_they_would_go": [{"shelter_id": "S", "live": {
             "sources": [{"title": "X", "uri": "https://maps.google.com/?cid=1", "place_id": "p1"}],
-            "current_name": "New Name", "notes": "from maps", "exists": True, "drive_minutes": 12.0}}],
+            "current_name": "New Name", "notes": "from maps", "exists": True, "drive_minutes": 12.0,
+            "wheelchair_entrance": "YES"},
+            "accessibility": {"value": "YES", "label": "VERIFIED LIVE", "note": "Google Maps reports ramp"}}],
         "link": "https://www.google.com/maps/place/x",
         "stored_pointer": {"place_id": "p1"},
     }
     out = plans.strip_maps(verification_like)
     text = json.dumps(out)
     assert "maps.google" not in text and "google.com/maps" not in text and "New Name" not in text
+    assert "drive_minutes" not in text and "wheelchair_entrance" not in text and "VERIFIED LIVE" not in text
     assert out["stored_pointer"] == {"place_id": "p1"}
-    assert out["where_they_would_go"][0]["live"] == {"exists": True, "drive_minutes": 12.0}
+    assert "live" not in out["where_they_would_go"][0]
+    assert "accessibility" not in out["where_they_would_go"][0]
 
 
 def test_place_id_rows_keep_only_pointer_verdict_time():

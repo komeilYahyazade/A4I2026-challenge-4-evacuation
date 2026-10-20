@@ -28,7 +28,7 @@ import json
 from collections import defaultdict
 from typing import Any, Mapping, Optional
 
-from .allocate import SHELTER_SEEKING_SHARE, fetch_inputs, ops_table, solve
+from .allocate import SHELTER_SEEKING_SHARE, compact, fetch_inputs, ops_table, solve
 from .config import AgentConfig, county_fips_or_error
 from .evidence import YES, payload, three_state
 from .reachability import PARATRANSIT_PROXY_KM
@@ -244,6 +244,23 @@ def rehearse_from(
     })
 
 
+def compact_rehearsal(r: Mapping[str, Any], body: Mapping[str, Any], top: int = 15) -> dict[str, Any]:
+    """Pure: the LLM-sized view of rehearsal.v1 (no cone, no full before/after layers)."""
+    out = {k: v for k, v in r.items() if k not in ("before", "after", "diff", "scenario")}
+    diff = dict(r["diff"])
+    moved = sorted(diff.pop("reassigned"), key=lambda x: -x["persons"])
+    diff.update(reassigned=moved[:top], reassigned_total=len(moved))
+    out.update(
+        compact=True,
+        full={"method": "POST", "path": "/api/rehearse", "body": dict(body)},
+        scenario={k: v for k, v in r["scenario"].items() if k != "cone"},
+        before=compact(r["before"], body={"county_fips": r["county_fips"]}, gaps=5),
+        after=compact(r["after"], body={"county_fips": r["county_fips"], "shelters_down": [d["shelter_id"] for d in r["shelters_down"]]}, gaps=5),
+        diff=diff,
+    )
+    return out
+
+
 def fetch_down(cfg: AgentConfig, advisory: str = DEFAULT_ADVISORY) -> Optional[list[dict[str, Any]]]:
     from .bq import render, run
 
@@ -332,9 +349,11 @@ async def rehearse(
     )
     down = pick_shelters_down(edges, down_rows, shelters_down)
     out = rehearse_from(tracts, edges, down, _scenario_meta(scenario, storm_rows, advisory), county_fips=fips)
-    if tool_context is not None:
-        tool_context.state["last_rehearsal_diff"] = {k: v for k, v in out["diff"].items() if not isinstance(v, list)}
-    return out
+    if tool_context is None:  # REST caller (the map): full before/after layers and the cone
+        return out
+    tool_context.state["last_rehearsal_diff"] = {k: v for k, v in out["diff"].items() if not isinstance(v, list)}
+    return compact_rehearsal(out, {"county_fips": fips, "scenario": scenario, "advisory": advisory,
+                                   "shelters_down": shelters_down})
 
 
 async def storm_track(scenario: str = "ian_2022") -> dict[str, Any]:

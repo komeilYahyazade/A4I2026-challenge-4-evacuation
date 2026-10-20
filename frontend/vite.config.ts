@@ -29,12 +29,23 @@ export default defineConfig(({ mode }) => {
       });
     },
   };
+  // Voice: the /run_live WebSocket upgrade carries the same ID token.
+  const wsProxy: ProxyOptions = {
+    target,
+    changeOrigin: true,
+    ws: true,
+    configure: (p) => {
+      p.on("proxyReqWs", (req) => {
+        if (token) req.setHeader("Authorization", `Bearer ${token}`);
+      });
+    },
+  };
   return {
     plugins: [react()],
     server: {
       host: "127.0.0.1",
       port: 5173,
-      proxy: { "/api": proxy, "/apps": proxy, "/run_sse": proxy },
+      proxy: { "/api": proxy, "/apps": proxy, "/run_sse": proxy, "/run_live": wsProxy },
     },
     build: { outDir: "dist", sourcemap: false },
   };

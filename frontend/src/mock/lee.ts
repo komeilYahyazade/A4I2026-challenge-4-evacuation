@@ -19,7 +19,16 @@ import type {
 
 const clone = <T,>(x: unknown): T => JSON.parse(JSON.stringify(x)) as T;
 
-export const mockMap = clone<CountyMap>(countyMap);
+export const mockMap: CountyMap = (() => {
+  const m = clone<CountyMap>(countyMap);
+  if (!m.care_facilities || m.care_facilities.length === 0) {
+    m.care_facilities = [
+      { facility_id: "105390", facility_name: "Cape Coral Rehabilitation & Healthcare (mock)", latitude: 26.582, longitude: -81.965, certified_beds: 120, km_to_generator_recorded_shelter: 14.4 },
+      { facility_id: "105412", facility_name: "Fort Myers Care Center (mock)", latitude: 26.635, longitude: -81.862, certified_beds: 150, km_to_generator_recorded_shelter: 4.2 },
+    ];
+  }
+  return m;
+})();
 export const mockAllocation = clone<Allocation>(allocation);
 export const mockBrief = clone<ReadinessBrief>(brief);
 export const mockStorm = clone<StormTrack>(storm);

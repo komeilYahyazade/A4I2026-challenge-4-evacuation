@@ -36,6 +36,12 @@ SITE_OPTIONS = 3
     people the first did not already cover. Seats needed is the people covered: it says how big
     the site must be, not that one exists.
 
+COMPACT_GAPS = 12
+    The chat tool returns a compact payload (compact: true): totals, unplaced tracts, site options and
+    the top gaps, without the per-pair assignment layer. A grounded request has a hard input-token cap,
+    and a full Lee allocation is about 250 KB. The map fetches the full payload from the REST route the
+    compact one points at.
+
 UNASSIGNED_COST_PER_PERSON
     A direct tract-to-sink arc priced above any real assignment, so the solve is always feasible
     and demand that cannot be placed comes back as a named gap instead of an infeasible model.
@@ -58,6 +64,7 @@ except ImportError:  # pragma: no cover
 
 SHELTER_SEEKING_SHARE = 1.0
 SITE_OPTIONS = 3
+COMPACT_GAPS = 12
 UNASSIGNED_COST_PER_PERSON = 10_000_000
 KM_COST_SCALE = 100  # integer cost units per km (min-cost flow needs integers)
 
@@ -133,13 +140,49 @@ def _shelters_from_edges(edges: Iterable[Mapping[str, Any]]) -> dict[str, dict[s
     return out
 
 
-def _excluded_reason(s: Mapping[str, Any], down: set[str], exclude_surge: bool) -> Optional[str]:
+def _duplicate_shelter_ids(shelters: Mapping[str, Mapping[str, Any]]) -> set[str]:
+    """Identify secondary FEMA shelter rows that duplicate the same physical building and coordinates."""
+    groups: dict[tuple[str, float, float], list[Mapping[str, Any]]] = defaultdict(list)
+    for s in shelters.values():
+        norm_name = re.sub(r"\s+", " ", str(s.get("name") or "").strip().upper())
+        lat, lng = s.get("lat"), s.get("lng")
+        if not norm_name or lat is None or lng is None:
+            continue
+        groups[(norm_name, round(float(lat), 4), round(float(lng), 4))].append(s)
+    dups: set[str] = set()
+    for rows in groups.values():
+        if len(rows) <= 1:
+            continue
+        ordered = sorted(
+            rows,
+            key=lambda s: (
+                0 if (
+                    s.get("is_pre_landfall")
+                    and not s.get("name_says_inactive")
+                    and s.get("capacity_status") == "RECORDED"
+                    and s.get("capacity")
+                    and not s.get("capacity_implausible")
+                ) else 1,
+                -(s.get("capacity") or 0),
+                str(s.get("shelter_id")),
+            ),
+        )
+        for dup in ordered[1:]:
+            dups.add(str(dup["shelter_id"]))
+    return dups
+
+
+def _excluded_reason(
+    s: Mapping[str, Any], down: set[str], exclude_surge: bool, duplicate_ids: Optional[set[str]] = None
+) -> Optional[str]:
     if s["shelter_id"] in down:
         return "DOWN"
     if not s["is_pre_landfall"]:
         return "NOT_PRE_LANDFALL"
     if s["name_says_inactive"]:
         return "NAME_SAYS_INACTIVE"
+    if duplicate_ids and s["shelter_id"] in duplicate_ids:
+        return "DUPLICATE_RECORD"
     if s["capacity_status"] != "RECORDED" or not s["capacity"]:
         return "CAPACITY_UNRECORDED"
     if s["capacity_implausible"]:
@@ -171,8 +214,9 @@ def solve(
 
     down = {str(s) for s in (shelters_down or [])}
     shelters = _shelters_from_edges(edges)
+    duplicate_ids = _duplicate_shelter_ids(shelters)
     for s in shelters.values():
-        s["excluded_reason"] = _excluded_reason(s, down, exclude_surge)
+        s["excluded_reason"] = _excluded_reason(s, down, exclude_surge, duplicate_ids)
         s["assigned_persons"] = 0
 
     tract_rows: dict[str, dict[str, Any]] = {}
@@ -431,6 +475,28 @@ def _could_not_tell(shelters: Mapping[str, Mapping[str, Any]]) -> list[dict[str,
     ]
 
 
+_SEVERITY_ORDER = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
+
+
+def compact(alloc: Mapping[str, Any], route: str = "/api/allocate", body: Optional[Mapping[str, Any]] = None,
+            gaps: int = COMPACT_GAPS) -> dict[str, Any]:
+    """Pure: the LLM-sized view of allocation.v1. Same payload_type; layers dropped, counts kept."""
+    out = {k: v for k, v in alloc.items() if k not in ("tracts", "shelters", "assignments", "gaps")}
+    ranked = sorted(alloc.get("gaps", []), key=lambda g: (_SEVERITY_ORDER.get(g.get("severity"), 3),
+                                                          -(g.get("persons_affected") or 0)))
+    excluded = alloc.get("params", {}).get("excluded_shelters", [])
+    out.update(
+        compact=True,
+        full={"method": "POST", "path": route, "body": dict(body or {"county_fips": alloc.get("county_fips")})},
+        gaps=ranked[:gaps],
+        gaps_total=len(ranked),
+        gap_counts={t: sum(1 for g in ranked if g["type"] == t) for t in sorted({g["type"] for g in ranked})},
+        tracts=[], shelters=[], assignments=[],
+        excluded_counts={r: sum(1 for e in excluded if e["reason"] == r) for r in sorted({e["reason"] for e in excluded})},
+    )
+    return out
+
+
 def ops_table(cfg: AgentConfig, view: str) -> str:
     """Backtick-quoted `project.<cfg.ops_dataset>.view`; the dataset comes from config (OPS_DATASET)."""
     if not _IDENT_RE.match(view):
@@ -462,7 +528,7 @@ async def allocate_county(
     """Assign the residents of no-vehicle households in a county to pre-landfall shelters within capacity.
 
     Use this for "where would people without a car go, does the capacity hold, and who is left
-    over". Solves a min-cost flow on straight-line distance (no Google Maps call), within max_km
+    over". Returns a compact summary (the map loads the full layers itself). Solves a min-cost flow on straight-line distance (no Google Maps call), within max_km
     (default 15 km, the 30-minute para-transit proxy). Shelters can be in any county. shelters_down
     takes shelter ids to treat as unavailable. Returns every assignment, unplaced demand by tract,
     shelter load, and gaps: unassigned demand, assigned shelters in the surge zone, and assigned
@@ -473,7 +539,21 @@ async def allocate_county(
     km = float(max_km) if max_km else PARATRANSIT_PROXY_KM
     share = float(shelter_seeking_share) if shelter_seeking_share else SHELTER_SEEKING_SHARE
     tracts, edges = await asyncio.to_thread(fetch_inputs, cfg, fips, km)
-    out = solve(tracts, edges, shelters_down=shelters_down, max_km=km, shelter_seeking_share=share, county_fips=fips)
-    if tool_context is not None:
-        tool_context.state["last_allocation_totals"] = out["totals"]
-    return out
+    effective_down = list(shelters_down or [])
+    if tool_context is not None and getattr(tool_context, "state", None) is not None:
+        for sid in tool_context.state.get("dropped_shelter_ids") or []:
+            if str(sid) not in effective_down:
+                effective_down.append(str(sid))
+    out = solve(
+        tracts,
+        edges,
+        shelters_down=effective_down or None,
+        max_km=km,
+        shelter_seeking_share=share,
+        county_fips=fips,
+    )
+    if tool_context is None:  # REST caller (the map): full layers
+        return out
+    tool_context.state["last_allocation_totals"] = out["totals"]
+    return compact(out, body={"county_fips": fips, "shelters_down": effective_down or shelters_down, "max_km": km,
+                              "shelter_seeking_share": share})

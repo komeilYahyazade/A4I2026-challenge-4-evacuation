@@ -172,8 +172,20 @@ def _shelter_summary(rows: list[Mapping[str, Any]],
     recorded_cap = [r for r in pre if r.get("capacity_status") == "RECORDED" and not r.get("capacity_implausible")
                     and not r.get("name_says_inactive")]
     plausible_capacity = sum(int(r.get("evacuation_capacity") or 0) for r in recorded_cap)
+    seen_fac: set[tuple[str, str]] = set()
+    dup_rows = 0
+    for r in rows:
+        nm = str(r.get("shelter_name") or "").strip().upper()
+        loc = str(r.get("address_1") or f"{r.get('latitude')},{r.get('longitude')}").strip().upper()
+        if nm:
+            key = (nm, loc)
+            if key in seen_fac:
+                dup_rows += 1
+            else:
+                seen_fac.add(key)
     return {
         "shelters": len(rows),
+        "duplicate_facility_rows": dup_rows,
         "pre_landfall": len(pre),
         "post_only_or_other": sum(1 for r in rows if r.get("usage") and not r.get("is_pre_landfall")),
         "usage_unrecorded": sum(1 for r in rows if not r.get("usage")),

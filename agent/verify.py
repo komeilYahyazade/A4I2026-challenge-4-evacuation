@@ -9,8 +9,11 @@ This is where grounding changes the answer:
 """
 
 import asyncio
+import collections
 import datetime
 import os
+import threading
+import time
 from typing import Any, Mapping, Optional
 
 from google.adk.tools import ToolContext
@@ -34,6 +37,24 @@ from .grounding import (
 from .reachability import MODEL_REPORTED, ROUTED
 
 _client: Any = None
+
+# Process-wide cap on grounded verification calls per rolling hour (MAPS_BUDGET_PER_HOUR). The agent
+# runs as a single Cloud Run instance, so this bounds what anonymous traffic can spend on Google Maps.
+_budget_lock = threading.Lock()
+_recent_calls: "collections.deque[float]" = collections.deque()
+
+
+def take_budget(n: int, per_hour: int, now: Optional[float] = None) -> int:
+    """Reserve up to n grounded calls within the hourly budget; returns how many may proceed."""
+    if per_hour <= 0:
+        return n
+    now = time.time() if now is None else now
+    with _budget_lock:
+        while _recent_calls and now - _recent_calls[0] > 3600:
+            _recent_calls.popleft()
+        allowed = max(0, min(n, per_hour - len(_recent_calls)))
+        _recent_calls.extend([now] * allowed)
+        return allowed
 
 
 def _genai_client(cfg: AgentConfig) -> Any:
@@ -158,7 +179,10 @@ def decide(row: Mapping[str, Any], raw: Mapping[str, Any], verified_at: Optional
         "notes": None,
     }
 
-    if raw.get("error"):
+    if raw.get("skipped"):
+        live.update(status="SKIPPED_BUDGET", label=UNRECORDED,
+                    notes="Live check skipped: the hourly Google Maps budget for this deployment is used up.")
+    elif raw.get("error"):
         live.update(status="ERROR", label=UNRECORDED, notes=raw["error"])
     elif not sources:
         live.update(status="NO_MAPS_EVIDENCE", label=UNRECORDED,
@@ -288,11 +312,13 @@ def ledger_from(results: list[dict[str, Any]], raws: list[Mapping[str, Any]]) ->
         if r["verdict"] == "DROP" or set(r["flags"]) & {
             "NAME_DIFFERS", "ACCESSIBILITY_CONFLICT", "TEMPORARILY_CLOSED", "NAME_SAYS_INACTIVE"}
     ]
+    called = [r for r in results if r["live"]["status"] != "SKIPPED_BUDGET"]
     return {
-        "maps_calls": len(results),
+        "maps_calls": len(called),
+        "skipped_budget": len(results) - len(called),
         "with_maps_sources": sum(1 for r in results if r["live"]["sources"]),
         "definite": sum(1 for r in results if r["live"]["status"] == "VERIFIED" and r["live"]["exists"] in (True, False)),
-        "unknown": sum(1 for r in results if r["live"]["status"] != "VERIFIED" or r["live"]["exists"] == "unknown"),
+        "unknown": sum(1 for r in called if r["live"]["status"] != "VERIFIED" or r["live"]["exists"] == "unknown"),
         "dropped": sum(1 for r in results if r["verdict"] == "DROP"),
         "wheelchair_answers_from_maps": sum(1 for r in results if r["live"]["wheelchair_entrance"] in ("yes", "no")),
         "routing_requested": sum(1 for x in raws if x.get("routing_requested")),
@@ -324,7 +350,9 @@ async def verify_rows(
             raw = await ground_one(row, origins.get(str(row.get("shelter_id"))), cfg)
             return decide(row, raw), raw
 
-    pairs = await asyncio.gather(*(one(r) for r in rows))
+    allowed = take_budget(len(rows), cfg.maps_budget_per_hour)
+    skipped = [(decide(r, {"skipped": True}), {"skipped": True}) for r in rows[allowed:]]
+    pairs = list(await asyncio.gather(*(one(r) for r in rows[:allowed]))) + skipped
     results = [p[0] for p in pairs]
     return results, ledger_from(results, [p[1] for p in pairs])
 
@@ -359,6 +387,11 @@ async def verify_shelters(
             origins = {r["shelter_id"]: {"lat": o["lat"], "lng": o["lon"]} for r in rows}
     results, ledger = await verify_rows(rows, origins, cfg)
     session_ledger = merge_ledger(tool_context.state if tool_context else None, ledger)
+    if tool_context is not None and getattr(tool_context, "state", None) is not None:
+        dropped = set(tool_context.state.get("dropped_shelter_ids") or [])
+        dropped.update(str(r["shelter_id"]) for r in results if r.get("verdict") == "DROP")
+        if dropped:
+            tool_context.state["dropped_shelter_ids"] = sorted(dropped)
     return payload("shelter_verification", {
         "verified_at": _now(),
         "results": results,

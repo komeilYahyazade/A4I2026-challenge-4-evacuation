@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, useReducer, useRef, type ReactNode } from "react";
 import { createSession, runSse } from "./api/adk";
 import { api } from "./api/rest";
-import { MOCK_ONLY } from "./config";
+import { CONFIG, MOCK_ONLY } from "./config";
 import type {
   AdkEvent,
   Allocation,
@@ -39,7 +39,14 @@ export interface ChatMsg {
   toolSources: MapsSource[];
 }
 
+export type Step = 1 | 2 | 3 | 4;
+
 export interface State {
+  countyFips: string;
+  step: Step;
+  chatOpen: boolean;
+  explain: boolean;
+  hoverTract: string | null;
   phase: Phase;
   tab: "brief" | "chat";
   rehearsalMode: boolean;
@@ -54,7 +61,7 @@ export interface State {
   verifying: string[];
   errors: { id: number; text: string }[];
   chat: ChatMsg[];
-  selected: { kind: "shelter" | "tract"; id: string } | null;
+  selected: { kind: "shelter" | "tract" | "fix"; id: string; from?: "map" | "list" } | null;
   focus: { at: LatLng; zoom?: number; n: number } | null;
   layers: Record<LayerKey, boolean>;
   advisoryIdx: number;
@@ -62,6 +69,11 @@ export interface State {
 }
 
 type Action =
+  | { type: "step"; step: Step }
+  | { type: "chat"; open: boolean }
+  | { type: "explain"; on: boolean }
+  | { type: "hoverTract"; id: string | null }
+  | { type: "county"; fips: string }
   | { type: "phase"; phase: Phase }
   | { type: "tab"; tab: State["tab"] }
   | { type: "rehearsalMode"; on: boolean }
@@ -90,6 +102,11 @@ const PHASE_LAYERS: Record<Phase, Record<LayerKey, boolean>> = {
 };
 
 const initial: State = {
+  countyFips: CONFIG.countyFips || "12071",
+  step: 1,
+  chatOpen: false,
+  explain: false,
+  hoverTract: null,
   phase: "brief",
   tab: "brief",
   rehearsalMode: false,
@@ -113,16 +130,49 @@ const initial: State = {
 
 let errSeq = 0;
 
+const STEP_PHASE: Record<Step, Phase> = { 1: "brief", 2: "brief", 3: "watch", 4: "plan" };
+
 function reducer(s: State, a: Action): State {
   switch (a.type) {
+    case "step":
+      return {
+        ...s,
+        step: a.step,
+        phase: STEP_PHASE[a.step],
+        layers: PHASE_LAYERS[STEP_PHASE[a.step]],
+        rehearsalMode: a.step === 3,
+        selected: null,
+        highlightFix: null,
+      };
+    case "chat":
+      return { ...s, chatOpen: a.open };
+    case "explain":
+      return { ...s, explain: a.on };
+    case "hoverTract":
+      return { ...s, hoverTract: a.id };
+    case "county":
+      return {
+        ...s,
+        countyFips: a.fips,
+        selected: null,
+        highlightFix: null,
+      };
     case "phase":
       return { ...s, phase: a.phase, layers: PHASE_LAYERS[a.phase], rehearsalMode: a.phase === "watch" ? s.rehearsalMode : false };
     case "tab":
       return { ...s, tab: a.tab };
     case "rehearsalMode":
       return { ...s, rehearsalMode: a.on };
-    case "load":
-      return { ...s, [a.key]: a.value, sources: { ...s.sources, [a.key]: a.source } };
+    case "load": {
+      let value = a.value;
+      // A brief that lands after live checks (slow first load) must not wipe them: carry them over.
+      if (a.key === "brief" && s.brief && value) {
+        const next = value as ReadinessBrief;
+        const checked = s.brief.where_they_would_go.filter((r) => r.live);
+        if (checked.length && next.county?.fips === s.brief.county?.fips) value = mergeVerification(next, checked);
+      }
+      return { ...s, [a.key]: value, sources: { ...s.sources, [a.key]: a.source } };
+    }
     case "verified": {
       if (!s.brief) return s;
       return { ...s, brief: mergeVerification(s.brief, a.value.results), sources: { ...s.sources, verify: a.source } };
@@ -226,6 +276,16 @@ function makeActions(d: React.Dispatch<Action>, get: () => State) {
         }
       }
       d({ type: "verified", value: v, source: src });
+      const dropped = new Set<string>();
+      for (const r of get().brief?.where_they_would_go || []) {
+        if (r.verdict === "DROP") dropped.add(r.shelter_id);
+      }
+      for (const r of v.results || []) {
+        if (r.verdict === "DROP") dropped.add(r.shelter_id);
+      }
+      if (dropped.size > 0 && (v.results || []).some((r) => r.verdict === "DROP")) {
+        void loadAllocation([...dropped]);
+      }
     } finally {
       inFlight--;
       d({ type: "verifying", ids, on: false });
@@ -233,21 +293,72 @@ function makeActions(d: React.Dispatch<Action>, get: () => State) {
     }
   }
 
-  const loadMap = () => load("map", api.map, () => mockMap);
-  const loadAllocation = () => load("allocation", () => api.allocate([]), () => mockAllocation);
-  const loadBrief = () => load("brief", () => api.brief(0), () => mockBrief);
+  const loadMap = (fips = get().countyFips) => load("map", () => api.map(fips), () => mockMap);
+  const loadAllocation = (down: string[] = [], fips = get().countyFips) =>
+    load("allocation", () => api.allocate(down, fips), () => mockAllocation);
+  // One brief request at a time: step 2 waits for the in-flight first load instead of starting another.
+  let briefInFlight: { fips: string; p: Promise<ReadinessBrief> } | null = null;
+  const loadBrief = (fips = get().countyFips): Promise<ReadinessBrief> => {
+    if (briefInFlight && briefInFlight.fips === fips) return briefInFlight.p;
+    const p = load("brief", () => api.brief(0, 5, fips), () => mockBrief).finally(() => {
+      if (briefInFlight?.p === p) briefInFlight = null;
+    });
+    briefInFlight = { fips, p };
+    return p;
+  };
   const loadStorm = () => load("storm", api.storm, () => mockStorm);
+  let verifiedFor: string | null = null;
 
-  return {
-    loadBase: async () => {
-      await Promise.allSettled([loadMap(), loadAllocation(), loadBrief()]);
+  const actions = {
+    loadBase: async (fips?: string) => {
+      const target = fips || get().countyFips;
+      await Promise.allSettled([loadMap(target), loadAllocation([], target), loadBrief(target)]);
     },
+
+    setCounty: async (fips: string) => {
+      d({ type: "county", fips });
+      const [m] = await Promise.allSettled([loadMap(fips), loadAllocation([], fips), loadBrief(fips)]);
+      if (m.status === "fulfilled" && m.value?.county) {
+        d({ type: "focus", at: { lat: m.value.county.lat, lng: m.value.county.lng }, zoom: 10 });
+      }
+    },
+
+    /** The one primary flow: each step sets the map layers and the panel, and loads what it needs. */
+    goStep: async (n: Step) => {
+      d({ type: "step", step: n });
+      const st = get();
+      if (n === 1) {
+        const c = st.map?.county;
+        if (c) d({ type: "focus", at: { lat: c.lat, lng: c.lng }, zoom: 10 });
+      }
+      if (n === 2 && verifiedFor !== st.countyFips) {
+        verifiedFor = st.countyFips;
+        await verifyTwo();
+      }
+      if (n === 3) {
+        d({ type: "focus", at: { lat: 26.45, lng: -82.0 }, zoom: 9 });
+        if (!st.storm) void loadStorm();
+        if (!st.rehearsal) await load("rehearsal", () => api.rehearse(null, null, st.countyFips), mockRehearsal);
+      }
+      if (n === 4) {
+        const at = coords(st.allocation?.site_options?.[0]?.ref);
+        if (at) d({ type: "focus", at, zoom: 11 });
+      }
+    },
+
+    /** Re-run the live check of two shelters (step 2). */
+    verifyTwo: () => verifyTwo(),
 
     /** Demo beat 1: the August brief, then two shelters checked live against Google Maps. */
     briefBeat: async () => {
-      d({ type: "phase", phase: "brief" });
-      d({ type: "rehearsalMode", on: false });
-      d({ type: "tab", tab: "brief" });
+      d({ type: "step", step: 2 });
+      await verifyTwo();
+    },
+  };
+
+  /** Two shelters against live Google Maps: the one whose FEMA name says INACTIVE first, then brief order. */
+  async function verifyTwo() {
+    {
       const st = get();
       const brief = st.brief ?? (await loadBrief());
       if (!st.map) void loadMap();
@@ -269,6 +380,17 @@ function makeActions(d: React.Dispatch<Action>, get: () => State) {
       }
       for (const r of candidates) if (jobs.length < 2 && !jobs.some(([id]) => id === r.shelter_id)) jobs.push([r.shelter_id, r.for_tract]);
       await Promise.allSettled(jobs.map(([id, origin]) => verify([id], origin)));
+    }
+  }
+
+  const rest = {
+    /** Voice (run_live) tool results go through exactly the same dispatch as chat; returns their Maps sources. */
+    ingestToolResponse: (response: Record<string, unknown> | undefined): { payloadType?: string; sources: MapsSource[] } => {
+      const resp = unwrap(response);
+      const pt = typeof resp?.payload_type === "string" ? (resp.payload_type as string) : undefined;
+      if (!resp || !pt) return { sources: [] };
+      dispatchPayload(pt, resp);
+      return { payloadType: pt, sources: sourcesFromPayload(pt, resp) };
     },
 
     /** Demo beat 2: Ian tabletop rehearsal. Never calls Maps. */
@@ -279,7 +401,7 @@ function makeActions(d: React.Dispatch<Action>, get: () => State) {
       d({ type: "focus", at: { lat: 26.45, lng: -82.0 }, zoom: 9 });
       const st = get();
       if (!st.storm) void loadStorm();
-      await load("rehearsal", () => api.rehearse(null, null), mockRehearsal);
+      await load("rehearsal", () => api.rehearse(null, null, st.countyFips), mockRehearsal);
     },
 
     /** Demo beat 3: what to fix before the season. */
@@ -319,9 +441,18 @@ function makeActions(d: React.Dispatch<Action>, get: () => State) {
       const tools: ToolChip[] = [];
       let toolMsgAdded = false;
       try {
-        if (!sessionRef.current) sessionRef.current = await createSession({ county_fips: "12071" });
-        for await (const ev of runSse(sessionRef.current, text)) {
-          handleEvent(ev);
+        if (!sessionRef.current) sessionRef.current = await createSession({ county_fips: get().countyFips });
+        // The manager is looking at one county; say so, so the agent never has to ask. The chat shows their own words.
+        const st = get();
+        const countyLabel = st.map?.county?.name || st.brief?.county?.name || "";
+        const sent = `[Context: ${countyLabel ? `${countyLabel.replace(/ County$/, "")} County, ` : ""}Florida, county FIPS ${st.countyFips}] ${text}`;
+        try {
+          for await (const ev of runSse(sessionRef.current, sent)) handleEvent(ev);
+        } catch (e) {
+          // Sessions live in the agent's memory; after a redeploy the old one 404s. Start a new one once.
+          if (!/HTTP 404/.test((e as Error).message)) throw e;
+          sessionRef.current = await createSession({ county_fips: get().countyFips });
+          for await (const ev of runSse(sessionRef.current, sent)) handleEvent(ev);
         }
       } catch (e) {
         d({ type: "chatAdd", msg: { id: `x${uid}`, role: "error", text: (e as Error).message, tools: [], groundingSources: [], toolSources: [] } });
@@ -385,7 +516,44 @@ function makeActions(d: React.Dispatch<Action>, get: () => State) {
     },
   };
 
+  return Object.assign(actions, rest);
+
+  /**
+   * v1.4: chat tools return compact payloads ({compact:true, full:{method,path,body}}) to stay under the
+   * model's input cap. Never draw a compact payload as the full plan: fetch the full one through the
+   * same-origin proxy (allowlisted paths only; the pointer comes from tool output), then draw that.
+   */
+  async function expandCompact(pt: string, resp: Record<string, unknown>) {
+    const full = resp.full as { method?: string; path?: string; body?: unknown } | undefined;
+    const allowed = new Set(["/api/allocate", "/api/rehearse"]);
+    const key = pt === "rehearsal.v1" ? "rehearsal" : "allocation";
+    if (!full || full.method !== "POST" || !full.path || !allowed.has(full.path)) {
+      d({ type: "error", text: `${pt}: chat returned a summary only; the map keeps the last full plan.` });
+      return;
+    }
+    d({ type: "busy", key, on: true });
+    try {
+      const res = await fetch(`${CONFIG.agentUrl}${full.path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(full.body ?? {}),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const payload = (await res.json()) as Record<string, unknown>;
+      dispatchPayload(String(payload.payload_type || pt), payload);
+    } catch (e) {
+      d({ type: "error", text: `${pt}: could not load the full payload (${(e as Error).message}); the map keeps the last full plan.` });
+    } finally {
+      d({ type: "busy", key, on: false });
+    }
+  }
+
   function dispatchPayload(pt: string, resp: Record<string, unknown>) {
+    if (resp.compact === true && (pt === "allocation.v1" || pt === "rehearsal.v1")) {
+      if (pt === "rehearsal.v1") d({ type: "step", step: 3 });
+      void expandCompact(pt, resp);
+      return;
+    }
     switch (pt) {
       case "readiness_brief.v1":
         d({ type: "load", key: "brief", value: resp, source: "live" });
@@ -401,8 +569,7 @@ function makeActions(d: React.Dispatch<Action>, get: () => State) {
         return;
       case "rehearsal.v1":
         d({ type: "load", key: "rehearsal", value: resp, source: "live" });
-        d({ type: "phase", phase: "watch" });
-        d({ type: "rehearsalMode", on: true });
+        d({ type: "step", step: 3 });
         return;
       case "storm_track.v1":
         d({ type: "load", key: "storm", value: resp, source: "live" });
@@ -441,14 +608,14 @@ function sourcesFromPayload(pt: string, resp: Record<string, unknown>): MapsSour
   return [];
 }
 
-function groundingToSources(ev: AdkEvent): MapsSource[] {
+export function groundingToSources(ev: AdkEvent): MapsSource[] {
   const chunks = ev.groundingMetadata?.groundingChunks || [];
   return chunks
     .filter((c) => c.maps)
     .map((c) => ({ title: c.maps!.title, uri: c.maps!.uri, place_id: c.maps!.placeId || c.maps!.place_id }));
 }
 
-function dedupe(src: MapsSource[]): MapsSource[] {
+export function dedupe(src: MapsSource[]): MapsSource[] {
   const m = new Map<string, MapsSource>();
   for (const s of src) m.set(s.place_id || s.uri || s.title || "", s);
   return [...m.values()];
