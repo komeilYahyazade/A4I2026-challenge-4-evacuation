@@ -1,0 +1,493 @@
+{
+  "_fixture": true,
+  "_note": "komeil-d2's docs/samples/readiness_brief.v1.json with v0.1 coordinate additions and real Lee emPOWER count (7,381).",
+  "payload_type": "readiness_brief.v1",
+  "schema_version": 1,
+  "county": {
+    "fips": "12071",
+    "name": "Lee",
+    "lat": 26.5767,
+    "lng": -81.8464
+  },
+  "generated_at": "2026-08-18T14:02:00+00:00",
+  "assumptions": {
+    "walk_km": 1.5,
+    "paratransit_max_minutes": 30,
+    "paratransit_straight_line_proxy_km": 15.0,
+    "car_search_km": 40.0,
+    "no_vehicle_households_min": 50,
+    "no_vehicle_share_min": 0.1,
+    "capacity_plausible_max": 100000,
+    "pre_landfall_usage": [
+      "EVAC",
+      "BOTH"
+    ],
+    "site_flood_share_high": 0.5,
+    "ranking": "Sum of state z-scores for no-vehicle share, 65+ share, disability share and mobile-home share, plus 1 if no shelter of any kind is within walking distance. No accessibility field, no hazard composite and no race or ethnicity is an input."
+  },
+  "county_shelters": {
+    "shelters": 7,
+    "pre_landfall": 6,
+    "post_only_or_other": 0,
+    "usage_unrecorded": 1,
+    "pre_landfall_capacity_plausible": 1200,
+    "pre_landfall_capacity_recorded": 3,
+    "pre_landfall_capacity_unrecorded": 1,
+    "capacity_implausible": 1,
+    "pre_landfall_name_says_inactive": 1,
+    "pre_landfall_name_says_inactive_spaces": 400,
+    "pre_landfall_flood_exposed_approx": 2,
+    "medical_needs": 1,
+    "medical_needs_generator_yes": 0,
+    "pre_landfall_wheelchair": {
+      "yes": 1,
+      "no": 1,
+      "unrecorded": 4
+    },
+    "pre_landfall_generator": {
+      "yes": 1,
+      "no": 0,
+      "unrecorded": 5
+    },
+    "pre_landfall_surge": {
+      "yes": 1,
+      "no": 0,
+      "unrecorded": 5
+    }
+  },
+  "power_dependence": {
+    "county_fips": "12071",
+    "power_dependent_dme": 7381,
+    "power_dependent_is_censored": false,
+    "label": "COUNTY-LEVEL"
+  },
+  "who_cannot_leave": [
+    {
+      "rank": 1,
+      "geo_id": "12071050100",
+      "lat": 26.701,
+      "lng": -81.881,
+      "priority_score": 4.1,
+      "people": {
+        "total_pop": 4100,
+        "households_no_vehicle": 420,
+        "pop_65_plus": 1300,
+        "pct_disability": 22.0,
+        "mobile_homes": 50
+      },
+      "reach": {
+        "km_any_shelter": 3.2,
+        "km_pre_landfall_shelter": 9.0,
+        "km_pre_landfall_wheelchair_recorded_yes": 9.0,
+        "shelters_within_walk": 0,
+        "pre_landfall_within_run": 3,
+        "within_run_wheelchair": {
+          "yes": 1,
+          "no": 1,
+          "unrecorded": 1
+        }
+      },
+      "hazard": {
+        "hurricane_exposed_pop": 4100,
+        "coastal_flood_exposed_pop": 900
+      },
+      "reasons": [
+        {
+          "text": "420 households without a vehicle (26%; state average 6%)",
+          "label": "RECORDED",
+          "source": "Census ACS (vehicle ownership)"
+        },
+        {
+          "text": "32% aged 65+ (state average 21%)",
+          "label": "RECORDED",
+          "source": "CDC SVI (ACS estimate)"
+        },
+        {
+          "text": "22% with a disability (state average 14%)",
+          "label": "RECORDED",
+          "source": "CDC SVI (ACS estimate)"
+        },
+        {
+          "text": "Mobility disability modeled at 11%",
+          "label": "MODELED",
+          "source": "CDC PLACES"
+        },
+        {
+          "text": "No shelter of any kind within 1.5 km straight-line",
+          "label": "RECORDED",
+          "source": "FEMA NSS, straight-line distance"
+        },
+        {
+          "text": "900 people exposed to coastal flooding",
+          "label": "RECORDED",
+          "source": "FEMA NRI"
+        }
+      ],
+      "mobility": {
+        "households_no_vehicle": 420,
+        "share_no_vehicle": 0.2625,
+        "needs_pickup_plan": true,
+        "straight_line_km": 12.5,
+        "drive_minutes": 18.0,
+        "distance_basis": "ROUTED (Google Maps routing, typical traffic, not evacuation traffic)",
+        "walkable": false,
+        "paratransit_reachable": true,
+        "car_reachable": true,
+        "status": "PICKUP_NEEDED",
+        "recommendation": "420 households have no vehicle and no shelter within walking distance. Stage a pickup point and a para-transit run (within 30 minutes)."
+      }
+    }
+  ],
+  "where_they_would_go": [
+    {
+      "for_tract": "12071050100",
+      "shelter_id": "A",
+      "name": "Alpha Elementary",
+      "lat": 26.6335,
+      "lng": -81.8478,
+      "flags": [
+        "NOT_FOUND"
+      ],
+      "address": "1 Main St, Fort Myers, 33901",
+      "straight_line_km": 9.0,
+      "record": {
+        "label": "RECORDED",
+        "capacity": 500,
+        "capacity_status": "RECORDED",
+        "capacity_as_filed": 500,
+        "capacity_implausible": false,
+        "usage": "EVAC",
+        "wheelchair": "YES",
+        "generator": "UNRECORDED",
+        "surge": "NO",
+        "is_medical": false,
+        "name_says_inactive": false,
+        "site_hazard": null
+      },
+      "live": {
+        "label": "VERIFIED LIVE",
+        "verified_at": "2026-10-20T15:49:18+00:00",
+        "sources": [
+          {
+            "title": "Place",
+            "uri": "https://maps.google.com/?cid=1",
+            "place_id": "places/p"
+          }
+        ],
+        "exists": false,
+        "current_name": null,
+        "place_type": null,
+        "closed": "unknown",
+        "wheelchair_entrance": "unknown",
+        "drive_minutes": null,
+        "road_km": null,
+        "drive_basis": null,
+        "notes": null,
+        "status": "VERIFIED"
+      },
+      "accessibility": {
+        "label": "RECORDED",
+        "summary": "FEMA records wheelchair access as YES. Google Maps did not say."
+      },
+      "verdict": "DROP",
+      "why": "Google Maps finds no place at this address. Removed from destinations until someone confirms it in person."
+    },
+    {
+      "for_tract": "12071050100",
+      "shelter_id": "B",
+      "name": "Bravo Middle School",
+      "lat": 26.623,
+      "lng": -81.871,
+      "flags": [],
+      "address": "1 Main St, Fort Myers, 33901",
+      "straight_line_km": 12.5,
+      "record": {
+        "label": "RECORDED",
+        "capacity": 500,
+        "capacity_status": "RECORDED",
+        "capacity_as_filed": 500,
+        "capacity_implausible": false,
+        "usage": "EVAC",
+        "wheelchair": "NO",
+        "generator": "UNRECORDED",
+        "surge": "UNRECORDED",
+        "is_medical": false,
+        "name_says_inactive": false,
+        "site_hazard": {
+          "label": "APPROXIMATE",
+          "coastal_flood_exposed_share": 0.54,
+          "coastal_flood_annual_frequency": 0.8,
+          "hurricane_annual_frequency": null,
+          "nearest_geo_id": "12071050100",
+          "km_to_centroid": 0.7,
+          "method": "nearest 2020 tract centroid by ST_DISTANCE (approximate)",
+          "note": "FEMA NRI coastal-flood exposure of the nearest 2020 census tract centroid. It describes the neighbourhood, not the building's elevation."
+        }
+      },
+      "live": {
+        "label": "VERIFIED LIVE",
+        "verified_at": "2026-10-20T15:49:18+00:00",
+        "sources": [
+          {
+            "title": "Place",
+            "uri": "https://maps.google.com/?cid=1",
+            "place_id": "places/p"
+          }
+        ],
+        "exists": true,
+        "current_name": "Bravo Middle School",
+        "place_type": null,
+        "closed": "no",
+        "wheelchair_entrance": "unknown",
+        "drive_minutes": 18.0,
+        "road_km": 15.0,
+        "drive_basis": "ROUTED (Google Maps routing, typical traffic, not evacuation traffic)",
+        "notes": null,
+        "status": "VERIFIED"
+      },
+      "accessibility": {
+        "label": "RECORDED",
+        "summary": "FEMA records wheelchair access as NO. Google Maps did not say."
+      },
+      "verdict": "KEEP",
+      "why": "Google Maps confirms a place at this address."
+    },
+    {
+      "for_tract": "12071050100",
+      "shelter_id": "C",
+      "name": "Charlie High School",
+      "lat": 26.642,
+      "lng": -81.99,
+      "flags": [],
+      "address": "1 Main St, Fort Myers, 33901",
+      "straight_line_km": 14.2,
+      "record": {
+        "label": "RECORDED",
+        "capacity": 500,
+        "capacity_status": "RECORDED",
+        "capacity_as_filed": 500,
+        "capacity_implausible": false,
+        "usage": "EVAC",
+        "wheelchair": "UNRECORDED",
+        "generator": "UNRECORDED",
+        "surge": "NO",
+        "is_medical": false,
+        "name_says_inactive": false,
+        "site_hazard": null
+      },
+      "live": null,
+      "accessibility": null,
+      "verdict": "NOT_VERIFIED_THIS_RUN",
+      "why": "Not checked against Google Maps in this brief."
+    }
+  ],
+  "fix_before_season": [
+    {
+      "type": "NOT_FOUND",
+      "severity": "HIGH",
+      "subject": "Alpha Elementary (A)",
+      "evidence": "Google Maps finds no place at this address; FEMA still lists 500 spaces.",
+      "action": "Confirm in person or by phone, then update or retire the FEMA record.",
+      "label": "VERIFIED LIVE",
+      "ref": {
+        "kind": "shelter",
+        "id": "A",
+        "lat": 26.6,
+        "lng": -81.9
+      }
+    },
+    {
+      "type": "NAME_SAYS_INACTIVE",
+      "severity": "HIGH",
+      "subject": "INACTIVE Grace Church (7)",
+      "evidence": "The FEMA record's own name reads 'INACTIVE Grace Church', yet it is still designated EVAC (pre-landfall).",
+      "action": "Confirm the building's status and remove the pre-landfall designation if it is out of use.",
+      "label": "RECORDED",
+      "ref": {
+        "kind": "shelter",
+        "id": "7",
+        "lat": 26.5,
+        "lng": -81.9
+      }
+    },
+    {
+      "type": "PRE_LANDFALL_IN_SURGE_ZONE",
+      "severity": "HIGH",
+      "subject": "S2 (2)",
+      "evidence": "Designated for use before landfall but recorded inside the SLOSH storm-surge area.",
+      "action": "Reassign to post-impact use or confirm elevation and hardening.",
+      "label": "RECORDED",
+      "ref": {
+        "kind": "shelter",
+        "id": "2",
+        "lat": 26.5,
+        "lng": -81.9
+      }
+    },
+    {
+      "type": "NO_WALKABLE_DESTINATION",
+      "severity": "HIGH",
+      "subject": "Tract 12071050100",
+      "evidence": "420 households without a vehicle; no shelter within 1.5 km.",
+      "action": "420 households have no vehicle and no shelter within walking distance. Stage a pickup point and a para-transit run (within 30 minutes).",
+      "label": "RECORDED",
+      "ref": {
+        "kind": "tract",
+        "id": "12071050100",
+        "lat": 26.6,
+        "lng": -81.8
+      }
+    },
+    {
+      "type": "PRE_LANDFALL_FLOOD_EXPOSED_SITE",
+      "severity": "MEDIUM",
+      "subject": "INACTIVE Grace Church (7)",
+      "evidence": "FEMA's surge flag is UNRECORDED, but 100% of the nearest tract's residents are exposed to coastal flooding (annual frequency 3.20). Approximate: neighbourhood, not building.",
+      "action": "Confirm the site's surge zone and elevation with the county before relying on it pre-landfall.",
+      "label": "APPROXIMATE",
+      "ref": {
+        "kind": "shelter",
+        "id": "7",
+        "lat": 26.5,
+        "lng": -81.9
+      }
+    },
+    {
+      "type": "GENERATOR_GAP",
+      "severity": "HIGH",
+      "subject": "Lee County",
+      "evidence": "7381 Medicare beneficiaries rely on electricity-dependent equipment; 1 medical-needs shelters, none recorded with a generator.",
+      "action": "Secure a generator-backed medical-needs site or a written transfer agreement.",
+      "label": "COUNTY-LEVEL",
+      "ref": {
+        "kind": "county",
+        "id": "12071",
+        "lat": 26.55,
+        "lng": -81.95
+      }
+    },
+    {
+      "type": "CARE_FACILITY_FAR_FROM_GENERATOR",
+      "severity": "HIGH",
+      "subject": "Shady Palms (105)",
+      "evidence": "120 certified beds; nearest pre-landfall shelter recorded with a generator is none within 40 km.",
+      "action": "Confirm an on-site generator and a transfer agreement exist.",
+      "label": "RECORDED",
+      "ref": {
+        "kind": "facility",
+        "id": "105",
+        "lat": 26.6,
+        "lng": -81.9
+      }
+    },
+    {
+      "type": "CAPACITY_IMPLAUSIBLE",
+      "severity": "MEDIUM",
+      "subject": "S3 (3)",
+      "evidence": "Recorded capacity 270135 is implausible; excluded from capacity totals.",
+      "action": "Correct the FEMA record. We leave the federal number as filed.",
+      "label": "RECORDED",
+      "ref": {
+        "kind": "shelter",
+        "id": "3",
+        "lat": 26.5,
+        "lng": -81.9
+      }
+    }
+  ],
+  "could_not_tell_you": [
+    {
+      "item": "Wheelchair access at pre-landfall shelters",
+      "spoken_to": 2,
+      "unassessed": 4,
+      "note": "2 I can speak to; 4 nobody has assessed.",
+      "label": "UNRECORDED"
+    },
+    {
+      "item": "Generators at pre-landfall shelters",
+      "spoken_to": 1,
+      "unassessed": 5,
+      "label": "UNRECORDED"
+    },
+    {
+      "item": "Surge-zone status of pre-landfall shelters",
+      "spoken_to": 1,
+      "unassessed": 5,
+      "label": "UNRECORDED",
+      "note": "FEMA's surge flag is blank for 5 of 6 pre-landfall shelters. A shelter that is not flagged is not known to be outside the surge zone."
+    },
+    {
+      "item": "Site flood exposure",
+      "label": "APPROXIMATE",
+      "note": "2 pre-landfall shelters sit in tracts where at least 50% of residents are exposed to coastal flooding. FEMA NRI coastal-flood exposure of the nearest 2020 census tract centroid. It describes the neighbourhood, not the building's elevation."
+    },
+    {
+      "item": "Capacity of pre-landfall shelters",
+      "spoken_to": 3,
+      "unassessed": 1,
+      "label": "UNRECORDED",
+      "note": "A blank or zero capacity on a pre-landfall shelter is unrecorded, not zero spaces. Capacity totals count recorded values only, and exclude shelters whose own name says inactive or closed (400 spaces)."
+    },
+    {
+      "item": "Shelter usage code (EVAC or POST)",
+      "unassessed": 1,
+      "note": "Shelters without a usage code are not counted as pre-landfall destinations.",
+      "label": "UNRECORDED"
+    },
+    {
+      "item": "Power-dependent residents",
+      "label": "COUNTY-LEVEL",
+      "note": "HHS emPOWER is published per county. We can say how many, never which tract or block."
+    },
+    {
+      "item": "Drive times",
+      "label": "RECORDED",
+      "note": "Straight-line distance is a lower bound. Routed times come from Google Maps for checked shelters only, and reflect typical traffic, not evacuation traffic."
+    },
+    {
+      "item": "Assisted living facilities",
+      "label": "UNRECORDED",
+      "note": "No national public roster exists; assisted living is state-licensed."
+    },
+    {
+      "item": "Mobile home parks",
+      "label": "RECORDED",
+      "note": "We have mobile-home counts per tract, not park locations."
+    },
+    {
+      "item": "Lack of reliable transportation",
+      "label": "UNRECORDED",
+      "note": "CDC PLACES does not publish this measure here. We quote vehicle ownership from the ACS, and owning no car is not the same as having no ride."
+    },
+    {
+      "item": "Live checks Google Maps could not settle",
+      "unassessed": 0,
+      "note": "2 of 2 grounded checks gave a definite answer.",
+      "label": "VERIFIED LIVE"
+    }
+  ],
+  "grounding_ledger": {
+    "maps_calls": 2,
+    "definite": 2,
+    "unknown": 0
+  },
+  "maps_sources": [
+    {
+      "title": "Place",
+      "uri": "https://maps.google.com/?cid=1",
+      "place_id": "places/p",
+      "supports_shelter_ids": [
+        "A",
+        "B"
+      ]
+    }
+  ],
+  "evidence_labels": {
+    "RECORDED": "Written in a federal record (FEMA NSS, Census ACS, CDC SVI, CMS, FEMA NRI). Historical: describes what was filed, not necessarily what is true today.",
+    "UNRECORDED": "The field is blank. Nobody wrote it down. This is never the same as 'no'.",
+    "VERIFIED LIVE": "Checked against Google Maps during this session, with a timestamp.",
+    "MODELED": "A statistical estimate (CDC PLACES), not a count.",
+    "COUNTY-LEVEL": "Published per county only (HHS emPOWER). Says how many, never which tract.",
+    "APPROXIMATE": "Derived from a federal record by our own approximation, such as a shelter matched to its nearest census tract centroid. Describes the neighbourhood, not the building."
+  }
+}

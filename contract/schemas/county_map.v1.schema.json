@@ -1,0 +1,262 @@
+{
+  "$defs": {
+    "County": {
+      "additionalProperties": true,
+      "properties": {
+        "fips": {
+          "title": "Fips",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Name"
+        },
+        "lat": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lat"
+        },
+        "lng": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lng"
+        }
+      },
+      "required": [
+        "fips",
+        "name"
+      ],
+      "title": "County",
+      "type": "object"
+    },
+    "MapShelter": {
+      "additionalProperties": true,
+      "properties": {
+        "shelter_id": {
+          "title": "Shelter Id",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Name"
+        },
+        "lat": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lat"
+        },
+        "lng": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lng"
+        },
+        "usage": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Usage"
+        },
+        "is_pre_landfall": {
+          "title": "Is Pre Landfall",
+          "type": "boolean"
+        },
+        "capacity": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Capacity"
+        },
+        "wheelchair": {
+          "enum": [
+            "YES",
+            "NO",
+            "UNRECORDED"
+          ],
+          "title": "Wheelchair",
+          "type": "string"
+        },
+        "generator": {
+          "enum": [
+            "YES",
+            "NO",
+            "UNRECORDED"
+          ],
+          "title": "Generator",
+          "type": "string"
+        },
+        "surge": {
+          "enum": [
+            "YES",
+            "NO",
+            "UNRECORDED"
+          ],
+          "title": "Surge",
+          "type": "string"
+        },
+        "is_medical": {
+          "title": "Is Medical",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "shelter_id",
+        "name",
+        "lat",
+        "lng",
+        "usage",
+        "is_pre_landfall",
+        "capacity",
+        "wheelchair",
+        "generator",
+        "surge",
+        "is_medical"
+      ],
+      "title": "MapShelter",
+      "type": "object"
+    },
+    "MapTract": {
+      "additionalProperties": true,
+      "properties": {
+        "geo_id": {
+          "title": "Geo Id",
+          "type": "string"
+        },
+        "lat": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lat"
+        },
+        "lng": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lng"
+        },
+        "households_no_vehicle": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Households No Vehicle"
+        }
+      },
+      "required": [
+        "geo_id",
+        "lat",
+        "lng",
+        "households_no_vehicle"
+      ],
+      "title": "MapTract",
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "properties": {
+    "payload_type": {
+      "const": "county_map.v1",
+      "title": "Payload Type",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "county_fips": {
+      "title": "County Fips",
+      "type": "string"
+    },
+    "county": {
+      "$ref": "#/$defs/County"
+    },
+    "tracts": {
+      "items": {
+        "$ref": "#/$defs/MapTract"
+      },
+      "title": "Tracts",
+      "type": "array"
+    },
+    "shelters": {
+      "items": {
+        "$ref": "#/$defs/MapShelter"
+      },
+      "title": "Shelters",
+      "type": "array"
+    }
+  },
+  "required": [
+    "payload_type",
+    "county_fips",
+    "county",
+    "tracts",
+    "shelters"
+  ],
+  "title": "CountyMapV1",
+  "type": "object",
+  "$comment": "contract 1.3; generated by `python -m agent.contract`"
+}

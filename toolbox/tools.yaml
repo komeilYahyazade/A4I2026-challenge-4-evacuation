@@ -1,0 +1,106 @@
+# MCP Toolbox for Databases: read-only registry lookups for the readiness agent.
+# Format: Toolbox v1 multi-document config (kind: source / tool / toolset).
+#
+# The agent consumes these over MCP at <TOOLBOX_URL>/mcp/evacuation_readiness, prefixed "toolbox_".
+# The judgment (ranking, verification, the brief) lives in the agent's Python tools; these are the
+# generic "show me the rows" tools that belong behind a managed MCP server.
+#
+# Local:      toolbox --config toolbox/tools.yaml
+# Cloud Run:  bash scripts/deploy_toolbox.sh   (min instances 1, private, BigQuery read-only)
+#
+# The dataset name is literal below. If you load into a different dataset, change it here too.
+
+kind: source
+name: evacuation-bq
+type: bigquery
+project: ${GOOGLE_CLOUD_PROJECT}
+location: US
+writeMode: blocked
+allowedDatasets:
+  - evacuation_readiness
+---
+kind: tool
+name: shelter_records_by_county
+type: bigquery-sql
+source: evacuation-bq
+description: >
+  Raw FEMA shelter registry rows for one county, with wheelchair, generator and surge flags as
+  YES, NO or UNRECORDED (blank). UNRECORDED means nobody wrote it down; it is never "no".
+  Historical registry: it does not say whether a building is open today.
+parameters:
+  - name: county_fips
+    type: string
+    description: 5-digit county FIPS code, e.g. 12071 for Lee County, Florida.
+statement: |
+  SELECT
+    CAST(shelter_id AS STRING) AS shelter_id,
+    shelter_name, address_1, city, zip, usage,
+    evacuation_capacity,
+    CASE WHEN evacuation_capacity IS NULL OR (evacuation_capacity = 0 AND IFNULL(usage IN ('EVAC', 'BOTH'), TRUE))
+         THEN 'UNRECORDED' ELSE 'RECORDED' END AS capacity_status,
+    CASE WHEN wheelchair_accessible IS TRUE THEN 'YES'
+         WHEN wheelchair_accessible IS FALSE THEN 'NO' ELSE 'UNRECORDED' END AS wheelchair_status,
+    CASE WHEN generator_onsite IS TRUE THEN 'YES'
+         WHEN generator_onsite IS FALSE THEN 'NO' ELSE 'UNRECORDED' END AS generator_status,
+    CASE WHEN in_surge_slosh_area IS TRUE THEN 'YES'
+         WHEN in_surge_slosh_area IS FALSE THEN 'NO' ELSE 'UNRECORDED' END AS surge_status,
+    IFNULL(is_medical, FALSE) AS is_medical,
+    REGEXP_CONTAINS(UPPER(IFNULL(shelter_name, '')), r'\b(INACTIVE|CLOSED|DEMOLISHED|DO NOT USE)\b') AS name_says_inactive
+  FROM `evacuation_readiness.shelters`
+  WHERE county_fips = @county_fips
+  ORDER BY shelter_name
+---
+kind: tool
+name: county_record_quality
+type: bigquery-sql
+source: evacuation-bq
+description: >
+  For one county, how many pre-landfall (EVAC) shelters have each flag recorded as YES, NO, or
+  left blank. Use it to say "N I can speak to; M nobody has assessed."
+parameters:
+  - name: county_fips
+    type: string
+    description: 5-digit county FIPS code.
+statement: |
+  SELECT
+    COUNT(*) AS pre_landfall_shelters,
+    COUNTIF(evacuation_capacity > 0) AS capacity_recorded,
+    COUNTIF(evacuation_capacity IS NULL OR evacuation_capacity = 0) AS capacity_unrecorded,
+    SUM(IF(evacuation_capacity > 0, evacuation_capacity, 0)) AS recorded_capacity_total,
+    COUNTIF(wheelchair_accessible IS TRUE) AS wheelchair_yes,
+    COUNTIF(wheelchair_accessible IS FALSE) AS wheelchair_no,
+    COUNTIF(wheelchair_accessible IS NULL) AS wheelchair_unrecorded,
+    COUNTIF(generator_onsite IS TRUE) AS generator_yes,
+    COUNTIF(generator_onsite IS FALSE) AS generator_no,
+    COUNTIF(generator_onsite IS NULL) AS generator_unrecorded,
+    COUNTIF(in_surge_slosh_area IS TRUE) AS surge_yes,
+    COUNTIF(in_surge_slosh_area IS NULL) AS surge_unrecorded
+  FROM `evacuation_readiness.shelters`
+  WHERE county_fips = @county_fips AND usage IN ('EVAC', 'BOTH')
+---
+kind: tool
+name: tract_record
+type: bigquery-sql
+source: evacuation-bq
+description: >
+  One census tract's row: population, households without a vehicle (ACS vehicle ownership),
+  age 65+, disability (CDC SVI), mobile homes, and modeled mobility disability (CDC PLACES).
+parameters:
+  - name: geo_id
+    type: string
+    description: 11-digit census tract id (2020 boundaries).
+statement: |
+  SELECT
+    geo_id, county_fips, total_pop, households, households_no_vehicle,
+    ROUND(SAFE_DIVIDE(households_no_vehicle, households), 4) AS share_no_vehicle,
+    pop_65_plus, pct_age_65_plus, pct_disability, pct_mobile_homes, mobile_homes,
+    pct_mobility AS pct_mobility_modeled
+  FROM `evacuation_readiness.vulnerability_tracts`
+  WHERE geo_id = @geo_id
+---
+kind: toolset
+name: evacuation_readiness
+tools:
+  - shelter_records_by_county
+  - county_record_quality
+  - tract_record

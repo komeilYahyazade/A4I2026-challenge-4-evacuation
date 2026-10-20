@@ -24,3 +24,13 @@ file's executable bit survived however your copy of this repo was created.
 
 Every table is fully replaced, never appended to. So if you cancel it halfway through, or you
 aren't sure whether it finished, just run it again—the end state is the same either way.
+
+## Deploying (agent lane)
+
+```bash
+GOOGLE_CLOUD_PROJECT=<project> bash scripts/deploy_toolbox.sh            # prints MCP_TOOLBOX_URL
+GOOGLE_CLOUD_PROJECT=<project> MCP_TOOLBOX_URL=<url> bash scripts/deploy_agent.sh
+```
+
+Both services are private and keep one warm instance, so the first request on stage does not pay
+a cold start. `docs/agent.md` covers running locally, the tools, and the design decisions.

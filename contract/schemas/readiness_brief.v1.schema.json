@@ -1,0 +1,507 @@
+{
+  "$defs": {
+    "CouldNotTell": {
+      "additionalProperties": true,
+      "properties": {
+        "item": {
+          "title": "Item",
+          "type": "string"
+        },
+        "label": {
+          "enum": [
+            "RECORDED",
+            "UNRECORDED",
+            "VERIFIED LIVE",
+            "MODELED",
+            "COUNTY-LEVEL",
+            "APPROXIMATE"
+          ],
+          "title": "Label",
+          "type": "string"
+        },
+        "spoken_to": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Spoken To"
+        },
+        "unassessed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unassessed"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "item",
+        "label"
+      ],
+      "title": "CouldNotTell",
+      "type": "object"
+    },
+    "County": {
+      "additionalProperties": true,
+      "properties": {
+        "fips": {
+          "title": "Fips",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Name"
+        },
+        "lat": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lat"
+        },
+        "lng": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lng"
+        }
+      },
+      "required": [
+        "fips",
+        "name"
+      ],
+      "title": "County",
+      "type": "object"
+    },
+    "Fix": {
+      "additionalProperties": true,
+      "description": "fix_before_season[] row; allocation gaps are a superset (severity, ref).",
+      "properties": {
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "subject": {
+          "title": "Subject",
+          "type": "string"
+        },
+        "evidence": {
+          "title": "Evidence",
+          "type": "string"
+        },
+        "action": {
+          "title": "Action",
+          "type": "string"
+        },
+        "label": {
+          "enum": [
+            "RECORDED",
+            "UNRECORDED",
+            "VERIFIED LIVE",
+            "MODELED",
+            "COUNTY-LEVEL",
+            "APPROXIMATE"
+          ],
+          "title": "Label",
+          "type": "string"
+        },
+        "severity": {
+          "anyOf": [
+            {
+              "enum": [
+                "HIGH",
+                "MEDIUM",
+                "LOW"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Severity"
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Ref"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "type",
+        "subject",
+        "evidence",
+        "action",
+        "label"
+      ],
+      "title": "Fix",
+      "type": "object"
+    },
+    "Live": {
+      "additionalProperties": true,
+      "properties": {
+        "label": {
+          "enum": [
+            "RECORDED",
+            "UNRECORDED",
+            "VERIFIED LIVE",
+            "MODELED",
+            "COUNTY-LEVEL",
+            "APPROXIMATE"
+          ],
+          "title": "Label",
+          "type": "string"
+        },
+        "verified_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Verified At"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/MapsSource"
+          },
+          "title": "Sources",
+          "type": "array"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Status"
+        }
+      },
+      "required": [
+        "label",
+        "sources"
+      ],
+      "title": "Live",
+      "type": "object"
+    },
+    "MapsSource": {
+      "additionalProperties": true,
+      "properties": {
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "uri": {
+          "title": "Uri",
+          "type": "string"
+        },
+        "place_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Place Id"
+        }
+      },
+      "required": [
+        "title",
+        "uri"
+      ],
+      "title": "MapsSource",
+      "type": "object"
+    },
+    "Ref": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "tract",
+            "shelter",
+            "facility",
+            "county"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "lat": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lat"
+        },
+        "lng": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lng"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "title": "Ref",
+      "type": "object"
+    },
+    "WhereTheyWouldGo": {
+      "additionalProperties": true,
+      "properties": {
+        "for_tract": {
+          "title": "For Tract",
+          "type": "string"
+        },
+        "shelter_id": {
+          "title": "Shelter Id",
+          "type": "string"
+        },
+        "record": {
+          "additionalProperties": true,
+          "title": "Record",
+          "type": "object"
+        },
+        "live": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Live"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "verdict": {
+          "enum": [
+            "KEEP",
+            "DROP",
+            "KEEP_UNVERIFIED",
+            "NOT_VERIFIED_THIS_RUN"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        },
+        "why": {
+          "title": "Why",
+          "type": "string"
+        }
+      },
+      "required": [
+        "for_tract",
+        "shelter_id",
+        "record",
+        "live",
+        "verdict",
+        "why"
+      ],
+      "title": "WhereTheyWouldGo",
+      "type": "object"
+    },
+    "WhoCannotLeave": {
+      "additionalProperties": true,
+      "properties": {
+        "rank": {
+          "title": "Rank",
+          "type": "integer"
+        },
+        "geo_id": {
+          "title": "Geo Id",
+          "type": "string"
+        },
+        "reasons": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Reasons",
+          "type": "array"
+        },
+        "mobility": {
+          "additionalProperties": true,
+          "title": "Mobility",
+          "type": "object"
+        }
+      },
+      "required": [
+        "rank",
+        "geo_id",
+        "reasons",
+        "mobility"
+      ],
+      "title": "WhoCannotLeave",
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "properties": {
+    "payload_type": {
+      "const": "readiness_brief.v1",
+      "title": "Payload Type",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "county": {
+      "$ref": "#/$defs/County"
+    },
+    "generated_at": {
+      "title": "Generated At",
+      "type": "string"
+    },
+    "assumptions": {
+      "additionalProperties": true,
+      "title": "Assumptions",
+      "type": "object"
+    },
+    "county_shelters": {
+      "additionalProperties": true,
+      "title": "County Shelters",
+      "type": "object"
+    },
+    "power_dependence": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Power Dependence"
+    },
+    "who_cannot_leave": {
+      "items": {
+        "$ref": "#/$defs/WhoCannotLeave"
+      },
+      "title": "Who Cannot Leave",
+      "type": "array"
+    },
+    "where_they_would_go": {
+      "items": {
+        "$ref": "#/$defs/WhereTheyWouldGo"
+      },
+      "title": "Where They Would Go",
+      "type": "array"
+    },
+    "fix_before_season": {
+      "items": {
+        "$ref": "#/$defs/Fix"
+      },
+      "title": "Fix Before Season",
+      "type": "array"
+    },
+    "could_not_tell_you": {
+      "items": {
+        "$ref": "#/$defs/CouldNotTell"
+      },
+      "title": "Could Not Tell You",
+      "type": "array"
+    },
+    "grounding_ledger": {
+      "additionalProperties": true,
+      "title": "Grounding Ledger",
+      "type": "object"
+    },
+    "maps_sources": {
+      "items": {
+        "$ref": "#/$defs/MapsSource"
+      },
+      "title": "Maps Sources",
+      "type": "array"
+    }
+  },
+  "required": [
+    "payload_type",
+    "county",
+    "generated_at",
+    "assumptions",
+    "county_shelters",
+    "power_dependence",
+    "who_cannot_leave",
+    "where_they_would_go",
+    "fix_before_season",
+    "could_not_tell_you",
+    "grounding_ledger",
+    "maps_sources"
+  ],
+  "title": "ReadinessBriefV1",
+  "type": "object",
+  "$comment": "contract 1.3; generated by `python -m agent.contract`"
+}

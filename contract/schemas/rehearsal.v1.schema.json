@@ -1,0 +1,1284 @@
+{
+  "$defs": {
+    "AllocShelter": {
+      "additionalProperties": false,
+      "properties": {
+        "shelter_id": {
+          "title": "Shelter Id",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Name"
+        },
+        "lat": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lat"
+        },
+        "lng": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lng"
+        },
+        "county_fips": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "County Fips"
+        },
+        "capacity": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Capacity"
+        },
+        "capacity_status": {
+          "enum": [
+            "RECORDED",
+            "UNRECORDED"
+          ],
+          "title": "Capacity Status",
+          "type": "string"
+        },
+        "capacity_implausible": {
+          "title": "Capacity Implausible",
+          "type": "boolean"
+        },
+        "is_pre_landfall": {
+          "title": "Is Pre Landfall",
+          "type": "boolean"
+        },
+        "wheelchair": {
+          "enum": [
+            "YES",
+            "NO",
+            "UNRECORDED"
+          ],
+          "title": "Wheelchair",
+          "type": "string"
+        },
+        "generator": {
+          "enum": [
+            "YES",
+            "NO",
+            "UNRECORDED"
+          ],
+          "title": "Generator",
+          "type": "string"
+        },
+        "surge": {
+          "enum": [
+            "YES",
+            "NO",
+            "UNRECORDED"
+          ],
+          "title": "Surge",
+          "type": "string"
+        },
+        "is_medical": {
+          "title": "Is Medical",
+          "type": "boolean"
+        },
+        "name_says_inactive": {
+          "title": "Name Says Inactive",
+          "type": "boolean"
+        },
+        "excluded_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Excluded Reason"
+        },
+        "assigned_persons": {
+          "title": "Assigned Persons",
+          "type": "integer"
+        },
+        "utilization": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Utilization"
+        }
+      },
+      "required": [
+        "shelter_id",
+        "name",
+        "lat",
+        "lng",
+        "county_fips",
+        "capacity",
+        "capacity_status",
+        "capacity_implausible",
+        "is_pre_landfall",
+        "wheelchair",
+        "generator",
+        "surge",
+        "is_medical",
+        "name_says_inactive",
+        "excluded_reason",
+        "assigned_persons",
+        "utilization"
+      ],
+      "title": "AllocShelter",
+      "type": "object"
+    },
+    "AllocTract": {
+      "additionalProperties": false,
+      "properties": {
+        "geo_id": {
+          "title": "Geo Id",
+          "type": "string"
+        },
+        "lat": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lat"
+        },
+        "lng": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lng"
+        },
+        "households_no_vehicle": {
+          "title": "Households No Vehicle",
+          "type": "integer"
+        },
+        "persons_per_household": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Persons Per Household"
+        },
+        "demand_persons": {
+          "title": "Demand Persons",
+          "type": "integer"
+        },
+        "assigned_persons": {
+          "title": "Assigned Persons",
+          "type": "integer"
+        },
+        "unassigned_persons": {
+          "title": "Unassigned Persons",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "geo_id",
+        "lat",
+        "lng",
+        "households_no_vehicle",
+        "persons_per_household",
+        "demand_persons",
+        "assigned_persons",
+        "unassigned_persons"
+      ],
+      "title": "AllocTract",
+      "type": "object"
+    },
+    "AllocationParams": {
+      "additionalProperties": false,
+      "properties": {
+        "max_km": {
+          "title": "Max Km",
+          "type": "number"
+        },
+        "shelter_seeking_share": {
+          "title": "Shelter Seeking Share",
+          "type": "number"
+        },
+        "shelters_down": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Shelters Down",
+          "type": "array"
+        },
+        "excluded_shelters": {
+          "items": {
+            "$ref": "#/$defs/ExcludedShelter"
+          },
+          "title": "Excluded Shelters",
+          "type": "array"
+        },
+        "exclude_surge": {
+          "title": "Exclude Surge",
+          "type": "boolean"
+        },
+        "capacity_rule": {
+          "title": "Capacity Rule",
+          "type": "string"
+        },
+        "demand_rule": {
+          "title": "Demand Rule",
+          "type": "string"
+        },
+        "cost_rule": {
+          "title": "Cost Rule",
+          "type": "string"
+        },
+        "distance_basis": {
+          "title": "Distance Basis",
+          "type": "string"
+        }
+      },
+      "required": [
+        "max_km",
+        "shelter_seeking_share",
+        "shelters_down",
+        "excluded_shelters",
+        "exclude_surge",
+        "capacity_rule",
+        "demand_rule",
+        "cost_rule",
+        "distance_basis"
+      ],
+      "title": "AllocationParams",
+      "type": "object"
+    },
+    "AllocationTotals": {
+      "additionalProperties": false,
+      "properties": {
+        "demand_persons": {
+          "title": "Demand Persons",
+          "type": "integer"
+        },
+        "assigned_persons": {
+          "title": "Assigned Persons",
+          "type": "integer"
+        },
+        "unassigned_persons": {
+          "title": "Unassigned Persons",
+          "type": "integer"
+        },
+        "usable_capacity": {
+          "title": "Usable Capacity",
+          "type": "integer"
+        },
+        "shelters_used": {
+          "title": "Shelters Used",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "demand_persons",
+        "assigned_persons",
+        "unassigned_persons",
+        "usable_capacity",
+        "shelters_used"
+      ],
+      "title": "AllocationTotals",
+      "type": "object"
+    },
+    "AllocationV1": {
+      "additionalProperties": true,
+      "properties": {
+        "payload_type": {
+          "const": "allocation.v1",
+          "title": "Payload Type",
+          "type": "string"
+        },
+        "schema_version": {
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "county_fips": {
+          "title": "County Fips",
+          "type": "string"
+        },
+        "generated_at": {
+          "title": "Generated At",
+          "type": "string"
+        },
+        "solver": {
+          "const": "ortools.SimpleMinCostFlow",
+          "title": "Solver",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "OPTIMAL",
+            "NO_DEMAND",
+            "SOLVER_ERROR"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/AllocationParams"
+        },
+        "totals": {
+          "$ref": "#/$defs/AllocationTotals"
+        },
+        "tracts": {
+          "items": {
+            "$ref": "#/$defs/AllocTract"
+          },
+          "title": "Tracts",
+          "type": "array"
+        },
+        "shelters": {
+          "items": {
+            "$ref": "#/$defs/AllocShelter"
+          },
+          "title": "Shelters",
+          "type": "array"
+        },
+        "assignments": {
+          "items": {
+            "$ref": "#/$defs/Assignment"
+          },
+          "title": "Assignments",
+          "type": "array"
+        },
+        "unassigned": {
+          "items": {
+            "$ref": "#/$defs/Unassigned"
+          },
+          "title": "Unassigned",
+          "type": "array"
+        },
+        "gaps": {
+          "items": {
+            "$ref": "#/$defs/Gap"
+          },
+          "title": "Gaps",
+          "type": "array"
+        },
+        "could_not_tell_you": {
+          "items": {
+            "$ref": "#/$defs/CouldNotTell"
+          },
+          "title": "Could Not Tell You",
+          "type": "array"
+        },
+        "site_options": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SiteOption"
+          },
+          "title": "Site Options",
+          "type": "array"
+        },
+        "maps_used": {
+          "const": false,
+          "title": "Maps Used",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "payload_type",
+        "county_fips",
+        "generated_at",
+        "solver",
+        "status",
+        "params",
+        "totals",
+        "tracts",
+        "shelters",
+        "assignments",
+        "unassigned",
+        "gaps",
+        "could_not_tell_you",
+        "maps_used"
+      ],
+      "title": "AllocationV1",
+      "type": "object"
+    },
+    "Assignment": {
+      "additionalProperties": false,
+      "properties": {
+        "geo_id": {
+          "title": "Geo Id",
+          "type": "string"
+        },
+        "shelter_id": {
+          "title": "Shelter Id",
+          "type": "string"
+        },
+        "persons": {
+          "title": "Persons",
+          "type": "integer"
+        },
+        "straight_line_km": {
+          "title": "Straight Line Km",
+          "type": "number"
+        },
+        "drive_minutes": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Drive Minutes"
+        },
+        "distance_basis": {
+          "title": "Distance Basis",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "WALK",
+            "PARATRANSIT"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "from": {
+          "$ref": "#/$defs/LatLng"
+        },
+        "to": {
+          "$ref": "#/$defs/LatLng"
+        }
+      },
+      "required": [
+        "geo_id",
+        "shelter_id",
+        "persons",
+        "straight_line_km",
+        "drive_minutes",
+        "distance_basis",
+        "mode",
+        "from",
+        "to"
+      ],
+      "title": "Assignment",
+      "type": "object"
+    },
+    "CouldNotTell": {
+      "additionalProperties": true,
+      "properties": {
+        "item": {
+          "title": "Item",
+          "type": "string"
+        },
+        "label": {
+          "enum": [
+            "RECORDED",
+            "UNRECORDED",
+            "VERIFIED LIVE",
+            "MODELED",
+            "COUNTY-LEVEL",
+            "APPROXIMATE"
+          ],
+          "title": "Label",
+          "type": "string"
+        },
+        "spoken_to": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Spoken To"
+        },
+        "unassessed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unassessed"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "item",
+        "label"
+      ],
+      "title": "CouldNotTell",
+      "type": "object"
+    },
+    "ExcludedShelter": {
+      "additionalProperties": false,
+      "properties": {
+        "shelter_id": {
+          "title": "Shelter Id",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Name"
+        },
+        "reason": {
+          "enum": [
+            "DOWN",
+            "NOT_PRE_LANDFALL",
+            "NAME_SAYS_INACTIVE",
+            "CAPACITY_UNRECORDED",
+            "CAPACITY_IMPLAUSIBLE",
+            "IN_SURGE_ZONE"
+          ],
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "shelter_id",
+        "name",
+        "reason"
+      ],
+      "title": "ExcludedShelter",
+      "type": "object"
+    },
+    "Gap": {
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "enum": [
+            "UNASSIGNED_DEMAND",
+            "ASSIGNED_SHELTER_IN_SURGE_ZONE",
+            "ASSESS_ASSIGNED_SHELTER",
+            "CAPACITY_UNRECORDED_EXCLUDED",
+            "CAPACITY_IMPLAUSIBLE_EXCLUDED"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "subject": {
+          "title": "Subject",
+          "type": "string"
+        },
+        "evidence": {
+          "title": "Evidence",
+          "type": "string"
+        },
+        "action": {
+          "title": "Action",
+          "type": "string"
+        },
+        "label": {
+          "enum": [
+            "RECORDED",
+            "UNRECORDED",
+            "VERIFIED LIVE",
+            "MODELED",
+            "COUNTY-LEVEL",
+            "APPROXIMATE"
+          ],
+          "title": "Label",
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "HIGH",
+            "MEDIUM",
+            "LOW"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "ref": {
+          "$ref": "#/$defs/Ref"
+        },
+        "persons_affected": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Persons Affected"
+        },
+        "households_affected": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Households Affected"
+        }
+      },
+      "required": [
+        "type",
+        "subject",
+        "evidence",
+        "action",
+        "label",
+        "severity",
+        "ref"
+      ],
+      "title": "Gap",
+      "type": "object"
+    },
+    "LatLng": {
+      "additionalProperties": false,
+      "properties": {
+        "lat": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lat"
+        },
+        "lng": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lng"
+        }
+      },
+      "required": [
+        "lat",
+        "lng"
+      ],
+      "title": "LatLng",
+      "type": "object"
+    },
+    "NewlyUnassigned": {
+      "additionalProperties": false,
+      "properties": {
+        "geo_id": {
+          "title": "Geo Id",
+          "type": "string"
+        },
+        "persons": {
+          "title": "Persons",
+          "type": "integer"
+        },
+        "lat": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lat"
+        },
+        "lng": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lng"
+        }
+      },
+      "required": [
+        "geo_id",
+        "persons",
+        "lat",
+        "lng"
+      ],
+      "title": "NewlyUnassigned",
+      "type": "object"
+    },
+    "Reassigned": {
+      "additionalProperties": false,
+      "properties": {
+        "geo_id": {
+          "title": "Geo Id",
+          "type": "string"
+        },
+        "from_shelter_id": {
+          "title": "From Shelter Id",
+          "type": "string"
+        },
+        "to_shelter_id": {
+          "title": "To Shelter Id",
+          "type": "string"
+        },
+        "persons": {
+          "title": "Persons",
+          "type": "integer"
+        },
+        "from": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LatLng"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "to_old": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LatLng"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "to_new": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LatLng"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "geo_id",
+        "from_shelter_id",
+        "to_shelter_id",
+        "persons",
+        "from",
+        "to_old",
+        "to_new"
+      ],
+      "title": "Reassigned",
+      "type": "object"
+    },
+    "Ref": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "tract",
+            "shelter",
+            "facility",
+            "county"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "lat": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lat"
+        },
+        "lng": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lng"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "title": "Ref",
+      "type": "object"
+    },
+    "RehearsalDiff": {
+      "additionalProperties": false,
+      "properties": {
+        "reassigned": {
+          "items": {
+            "$ref": "#/$defs/Reassigned"
+          },
+          "title": "Reassigned",
+          "type": "array"
+        },
+        "newly_unassigned": {
+          "items": {
+            "$ref": "#/$defs/NewlyUnassigned"
+          },
+          "title": "Newly Unassigned",
+          "type": "array"
+        },
+        "unassigned_before": {
+          "title": "Unassigned Before",
+          "type": "integer"
+        },
+        "unassigned_after": {
+          "title": "Unassigned After",
+          "type": "integer"
+        },
+        "capacity_lost": {
+          "title": "Capacity Lost",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "reassigned",
+        "newly_unassigned",
+        "unassigned_before",
+        "unassigned_after",
+        "capacity_lost"
+      ],
+      "title": "RehearsalDiff",
+      "type": "object"
+    },
+    "Scenario": {
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "storm_id": {
+          "title": "Storm Id",
+          "type": "string"
+        },
+        "landfall_at": {
+          "title": "Landfall At",
+          "type": "string"
+        },
+        "landfall": {
+          "$ref": "#/$defs/LatLng"
+        },
+        "advisory": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Advisory"
+        },
+        "issued_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Issued At"
+        },
+        "cone": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "GeoJSON Geometry (Polygon|MultiPolygon), [lng, lat]",
+          "title": "Cone"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "storm_id",
+        "landfall_at",
+        "landfall",
+        "source"
+      ],
+      "title": "Scenario",
+      "type": "object"
+    },
+    "ShelterDown": {
+      "additionalProperties": false,
+      "properties": {
+        "shelter_id": {
+          "title": "Shelter Id",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Name"
+        },
+        "lat": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lat"
+        },
+        "lng": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lng"
+        },
+        "reason": {
+          "enum": [
+            "IN_SURGE_ZONE",
+            "IN_CONE_AND_SURGE",
+            "COASTAL_FLOOD_TRACT",
+            "REPORTED_CLOSED",
+            "MANUAL"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "rule": {
+          "title": "Rule",
+          "type": "string"
+        },
+        "in_plan": {
+          "title": "In Plan",
+          "type": "boolean"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "shelter_id",
+        "name",
+        "lat",
+        "lng",
+        "reason",
+        "rule",
+        "in_plan"
+      ],
+      "title": "ShelterDown",
+      "type": "object"
+    },
+    "SiteOption": {
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "const": "DESIGNATE_SITE_NEAR",
+          "title": "Type",
+          "type": "string"
+        },
+        "subject": {
+          "title": "Subject",
+          "type": "string"
+        },
+        "evidence": {
+          "title": "Evidence",
+          "type": "string"
+        },
+        "action": {
+          "title": "Action",
+          "type": "string"
+        },
+        "label": {
+          "enum": [
+            "RECORDED",
+            "UNRECORDED",
+            "VERIFIED LIVE",
+            "MODELED",
+            "COUNTY-LEVEL",
+            "APPROXIMATE"
+          ],
+          "title": "Label",
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "HIGH",
+            "MEDIUM",
+            "LOW"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "ref": {
+          "$ref": "#/$defs/Ref"
+        },
+        "persons_covered": {
+          "title": "Persons Covered",
+          "type": "integer"
+        },
+        "seats_needed": {
+          "title": "Seats Needed",
+          "type": "integer"
+        },
+        "tracts_covered": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tracts Covered",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "subject",
+        "evidence",
+        "action",
+        "label",
+        "severity",
+        "ref",
+        "persons_covered",
+        "seats_needed",
+        "tracts_covered"
+      ],
+      "title": "SiteOption",
+      "type": "object"
+    },
+    "Unassigned": {
+      "additionalProperties": false,
+      "properties": {
+        "geo_id": {
+          "title": "Geo Id",
+          "type": "string"
+        },
+        "persons": {
+          "title": "Persons",
+          "type": "integer"
+        },
+        "reason": {
+          "enum": [
+            "NO_SHELTER_WITHIN_MAX_KM",
+            "CAPACITY_EXHAUSTED"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "lat": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lat"
+        },
+        "lng": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lng"
+        }
+      },
+      "required": [
+        "geo_id",
+        "persons",
+        "reason",
+        "lat",
+        "lng"
+      ],
+      "title": "Unassigned",
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "properties": {
+    "payload_type": {
+      "const": "rehearsal.v1",
+      "title": "Payload Type",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "county_fips": {
+      "title": "County Fips",
+      "type": "string"
+    },
+    "generated_at": {
+      "title": "Generated At",
+      "type": "string"
+    },
+    "scenario": {
+      "$ref": "#/$defs/Scenario"
+    },
+    "shelters_down": {
+      "items": {
+        "$ref": "#/$defs/ShelterDown"
+      },
+      "title": "Shelters Down",
+      "type": "array"
+    },
+    "at_risk_not_in_plan": {
+      "items": {
+        "$ref": "#/$defs/ShelterDown"
+      },
+      "title": "At Risk Not In Plan",
+      "type": "array"
+    },
+    "before": {
+      "$ref": "#/$defs/AllocationV1"
+    },
+    "after": {
+      "$ref": "#/$defs/AllocationV1"
+    },
+    "diff": {
+      "$ref": "#/$defs/RehearsalDiff"
+    },
+    "maps_used": {
+      "const": false,
+      "title": "Maps Used",
+      "type": "boolean"
+    },
+    "note": {
+      "title": "Note",
+      "type": "string"
+    }
+  },
+  "required": [
+    "payload_type",
+    "county_fips",
+    "generated_at",
+    "scenario",
+    "shelters_down",
+    "at_risk_not_in_plan",
+    "before",
+    "after",
+    "diff",
+    "maps_used",
+    "note"
+  ],
+  "title": "RehearsalV1",
+  "type": "object",
+  "$comment": "contract 1.3; generated by `python -m agent.contract`"
+}
