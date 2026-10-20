@@ -22,6 +22,28 @@ def test_single_agent_on_gemini_3_with_maps_and_all_tools():
         assert fn.__name__ in names
 
 
+def test_instruction_names_the_bigquery_project_and_datasets():
+    # Without this the agent guesses project ids for the BigQuery MCP tools.
+    for model in ("gemini-3.6-flash", "gemini-2.5-flash"):
+        agent = build_root_agent(AgentConfig(project_id="demo-project", model_name=model))
+        assert "demo-project" in agent.instruction
+        assert "evacuation_readiness" in agent.instruction and "readiness_ops" in agent.instruction
+        assert "{" not in agent.instruction and "}" not in agent.instruction
+
+
+def test_instruction_without_a_project_is_the_base_instruction():
+    assert build_root_agent(AgentConfig()).instruction == SYSTEM_INSTRUCTION
+
+
+def test_tool_errors_go_back_to_the_model_instead_of_ending_the_turn():
+    agent = build_root_agent(AgentConfig(project_id="demo-project"))
+    result = agent.on_tool_error_callback(
+        tool=None, args={"county_fips": "00000"}, tool_context=None,
+        error=ValueError("County 00000 is not in FL"))
+    assert result["status"] == "error"
+    assert "County 00000 is not in FL" in result["error"]
+
+
 def test_sub_agent_fallback_on_gemini_2_5():
     agent = build_root_agent(AgentConfig(project_id="demo-project", model_name="gemini-2.5-flash"))
     assert isinstance(agent.tools[0], AgentTool)
@@ -82,6 +104,12 @@ def test_managed_bigquery_mcp_is_opt_in():
     ts = bigquery_mcp_toolset(AgentConfig(project_id="demo-project", bigquery_mcp_enabled=True))
     assert ts[0]._connection_params.url == "https://bigquery.googleapis.com/mcp"
     assert ts[0]._header_provider is not None
+
+
+def test_managed_bigquery_mcp_exposes_only_small_read_tools():
+    # The full tool list is ~630 KB of schema and trips the per-minute token quota.
+    ts = bigquery_mcp_toolset(AgentConfig(project_id="demo-project", bigquery_mcp_enabled=True))
+    assert ts[0].tool_filter == ["list_table_ids", "execute_sql_readonly"]
 
 
 def test_audit_reports_coverage_of_the_countys_need():
