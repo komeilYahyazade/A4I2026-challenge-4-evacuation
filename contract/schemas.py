@@ -14,7 +14,9 @@ from pydantic import BaseModel, ConfigDict, Field
 # ---- enums ------------------------------------------------------------------------------------
 
 Flag = Literal["yes", "no", "unrecorded"]
-Freshness = Literal["historical", "live"]
+Freshness = Literal["historical", "live", "field"]  # field: what the shelter operator said, by date
+FieldAnswer = Literal["yes", "no", "unclear"]  # unclear is unrecorded, never no
+OptionalAnswer = Literal["yes", "no", "unknown"]
 SourceKind = Literal[
     "fema_nss", "acs", "cdc_svi", "cdc_places", "fema_nri", "cms", "hhs_empower", "google_maps"
 ]
@@ -30,6 +32,7 @@ FixCategory = Literal[
     "shelter_in_surge_zone",
     "record_mismatch",
     "medical_needs_gap",
+    "field_assessment",  # an operator said a wheelchair user cannot get in unaccompanied
 ]
 Track = Literal["shelter_readiness", "getting_people_out", "medically_dependent"]
 Step = Literal["rank_tracts", "find_shelters", "verify_shelters", "find_gaps", "write_brief", "complete"]
@@ -79,6 +82,20 @@ class LatLon(_Model):
     lon: float
 
 
+class FieldAssessment(_Model):
+    """What the shelter operator told the manager. Newest per shelter wins; rows are append-only."""
+    assessment_id: str | None = None  # null on rows written before the assessment agent existed
+    shelter_id: str
+    wheelchair_unaccompanied: FieldAnswer  # can a wheelchair user get in, alone, today
+    ramp_unlocked_24_7: OptionalAnswer = "unknown"
+    generator_powers_medical_outlets: OptionalAnswer = "unknown"
+    notes: str | None = None  # the operator's words, no personal names
+    assessor_role: str | None = None
+    assessed_at: datetime
+    source: Literal["field_assessment"] = "field_assessment"
+    freshness: Literal["field"] = "field"
+
+
 class Shelter(_Model):
     shelter_id: str
     name: str
@@ -98,6 +115,7 @@ class Shelter(_Model):
     place_id: str | None = None  # null until verified once
     source: Literal["fema_nss"] = "fema_nss"
     freshness: Literal["historical"] = "historical"
+    field_assessment: FieldAssessment | None = None  # the record stays FEMA's; this sits beside it
 
 
 class WheelchairCheck(_Model):
@@ -457,6 +475,32 @@ class ChatRequest(_Model):
 class ToolCall(_Model):
     name: str
     duration_ms: int
+
+
+# ---- routes: field assessment -----------------------------------------------------------------
+
+
+class ShelterContact(_Model):
+    """The building's public listing from Google Maps, for the manager to call. Never stored."""
+    checked_at: datetime
+    maps_name: str | None = None
+    phone: str | None = None
+    website: str | None = None
+    note: str | None = None
+    sources: list[Source] = Field(default_factory=list)
+
+
+class AssessRequest(_Model):
+    session_id: str | None = None
+    message: str
+
+
+class AssessResponse(_Model):
+    session_id: str
+    shelter_id: str
+    reply: str
+    contact: ShelterContact | None = None  # present on the turn the agent looked it up
+    saved: FieldAssessment | None = None  # present on the turn the assessment was saved
 
 
 class ChatResponse(_Model):

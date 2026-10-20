@@ -21,6 +21,8 @@ from contract.schemas import BriefJudgments  # noqa: E402
 
 from readiness_agent import brief_plan, config, prompts  # noqa: E402
 from readiness_agent.tools import facts  # noqa: E402
+from readiness_agent.tools.assess import (  # noqa: E402
+    get_field_assessments, get_shelter_contact, save_field_assessment)
 from readiness_agent.tools.care import list_care_facilities  # noqa: E402
 from readiness_agent.tools.gaps import find_readiness_gaps  # noqa: E402
 from readiness_agent.tools.mcp import bigquery_mcp  # noqa: E402
@@ -70,7 +72,17 @@ readiness_agent = LlmAgent(
     model=config.MODEL,
     description="Answers an emergency manager's hurricane-season planning questions.",
     instruction=prompts.CHAT,
-    tools=[*CUSTOM_TOOLS, google_maps_grounding, bigquery_mcp],
+    tools=[*CUSTOM_TOOLS, FunctionTool(get_field_assessments), google_maps_grounding, bigquery_mcp],
+)
+
+# The README's add-on: a conversation that produces the accessibility record nobody wrote down.
+assessment_agent = LlmAgent(
+    name="assessment_agent",
+    model=config.MODEL,
+    description="Records what a shelter operator says about wheelchair access, one shelter at a time.",
+    instruction=prompts.ASSESS,
+    tools=[FunctionTool(get_shelter_contact), FunctionTool(save_field_assessment)],
+    generate_content_config=types.GenerateContentConfig(temperature=0.2),
 )
 
 root_agent = readiness_agent

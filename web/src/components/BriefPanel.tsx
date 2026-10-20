@@ -68,7 +68,10 @@ export function BriefPanel({ brief, ins, map, audit, reachKm, onSelect, onHighli
   const byStatus = (s: string) => checked.filter((d) => d.verification?.status === s);
   const blanksAnswered = checked.filter((d) => d.verification?.wheelchair.agreement === "record_blank").length;
   const blanks = checked.filter((d) => d.shelter.wheelchair_accessible === "unrecorded").length;
-  const dropped = dests.filter((d) => d.verdict === "do_not_rely");
+  const operatorNo = (d: (typeof dests)[number]) => d.shelter.field_assessment?.wheelchair_unaccompanied === "no";
+  // An operator's "no" is field evidence, not something Google Maps changed: it gets its own card.
+  const dropped = dests.filter((d) => d.verdict === "do_not_rely" && !operatorNo(d));
+  const assessed = dests.filter((d) => d.shelter.field_assessment);
   const evac = (f: string) => ins?.flags.find((r) => r.scope === "evac" && r.flag === f);
   const who = brief.who_cannot_leave.filter((w) => w.kind === whoTab);
   const isSel = (kind: string, id: string) => selection?.kind === kind && selection.id === id;
@@ -108,6 +111,23 @@ export function BriefPanel({ brief, ins, map, audit, reachKm, onSelect, onHighli
         ))}
         {blanksAnswered > 0 && <div className="small muted" style={{ marginTop: 4 }}>A Maps "accessible entrance" fills a blank record but does not close it: those stay <i>verify before season</i>.</div>}
       </div>
+
+      {assessed.length > 0 && (
+        <div className="card assess">
+          <b>What operators told us</b> <span className="fresh field">field assessment</span>
+          {assessed.map((d) => {
+            const a = d.shelter.field_assessment!;
+            return (
+              <div key={d.shelter.shelter_id} className="small" style={{ marginTop: 4 }}>
+                {a.wheelchair_unaccompanied === "yes" ? "✓" : a.wheelchair_unaccompanied === "no" ? "✕" : "?"} <b>{d.shelter.name}</b>:{" "}
+                {a.wheelchair_unaccompanied === "yes" ? "a wheelchair user can get in unaccompanied"
+                  : a.wheelchair_unaccompanied === "no" ? "a wheelchair user cannot get in unaccompanied" : "unclear"}
+                {" "}<span className="muted">({a.assessor_role ?? "operator"}, {a.assessed_at.slice(0, 10)})</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="section-title"><span className="n">1</span>Who cannot leave</div>
       <div className="filters">

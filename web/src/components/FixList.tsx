@@ -10,6 +10,7 @@ const CAT: Record<FixCategory, { label: string; icon: string }> = {
   shelter_in_surge_zone: { label: "Shelter in surge zone", icon: "≋" },
   record_mismatch: { label: "Record vs Google Maps", icon: "≠" },
   medical_needs_gap: { label: "Medical-needs capacity", icon: "✚" },
+  field_assessment: { label: "Operator says no access", icon: "☎" },
 };
 
 export function FixList({ brief, map, onHighlight, onSelect }: {

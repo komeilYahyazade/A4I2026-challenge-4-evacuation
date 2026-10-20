@@ -17,7 +17,8 @@ export function Segments({ segments, sources, checkedAt }: { segments: Segment[]
           <div className="seg" key={i}>
             {seg.text}
             <span className={`fresh ${seg.freshness}`}>
-              {seg.freshness === "live" ? `live${checkedAt ? " · " + hhmm(checkedAt) : ""}` : "historical"}
+              {seg.freshness === "live" ? `live${checkedAt ? " · " + hhmm(checkedAt) : ""}`
+                : seg.freshness === "field" ? "field assessment" : "historical"}
             </span>
             {srcs.length > 0 && (
               <div className="src">

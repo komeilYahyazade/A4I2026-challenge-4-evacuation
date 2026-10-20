@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "../api";
-import type { Brief, CountyInsights, CountyMap, Selection, Shelter, ShelterDetail, ShelterVerification } from "../types";
+import type { Brief, CountyInsights, CountyMap, FieldAssessment, Selection, Shelter, ShelterDetail, ShelterVerification } from "../types";
 import { VSTATUS, evidence, fmt, haversineKm, hhmm, km, tractLabel } from "../format";
+import { AssessPanel, FieldAssessmentCard } from "./AssessPanel";
 import { FlagChip, GoogleMaps, Segments, Tag } from "./Attribution";
 
 function Nearby({ from, shelters, limit = 8, filter, onSelect, verifications }: {
@@ -28,10 +29,10 @@ function Nearby({ from, shelters, limit = 8, filter, onSelect, verifications }: 
   );
 }
 
-export function ShelterPanel({ selection, map, brief, ins, verifications, onVerified, onSelect, reachKm }: {
+export function ShelterPanel({ selection, map, brief, ins, verifications, onVerified, onSelect, reachKm, onAssessed }: {
   selection: Selection; map: CountyMap | null; brief: Brief | null; ins: CountyInsights | null;
   verifications: Record<string, ShelterVerification>; onVerified: (v: ShelterVerification) => void;
-  onSelect: (s: Selection) => void; reachKm: number;
+  onSelect: (s: Selection) => void; reachKm: number; onAssessed?: (a: FieldAssessment) => void;
 }) {
   const [detail, setDetail] = useState<ShelterDetail | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -125,6 +126,10 @@ export function ShelterPanel({ selection, map, brief, ins, verifications, onVeri
             <dt>FEMA status</dt><dd>{detail.shelter_status_code ?? "–"} <span className="muted small">(a historical registry, not operational status)</span></dd>
           </dl>
         </div>
+        {detail.field_assessment && <FieldAssessmentCard a={detail.field_assessment} />}
+        {!detail.field_assessment && <div className="muted small" style={{ marginTop: 6 }}>Nobody has assessed whether a wheelchair user can get in here.</div>}
+        <AssessPanel key={detail.shelter_id} shelterId={detail.shelter_id}
+          onSaved={(a) => { setDetail((d) => (d ? { ...d, field_assessment: a } : d)); onAssessed?.(a); }} />
         <div className="card">
           <b><GoogleMaps /></b> {v ? <span className="fresh live">checked {hhmm(v.checked_at)}</span> : <span className="fresh">not checked yet</span>}
           {v && st && (<>
