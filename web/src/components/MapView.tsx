@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AdvancedMarker, APIProvider, Map, useMap } from "@vis.gl/react-google-maps";
-import type { Affected, Brief, CountyMap, Selection, ShelterVerification, Tract } from "../types";
+import type { Affected, Allocation, Brief, CountyMap, GeoJsonGeometry, Rehearsal, Selection, ShelterVerification, Step, StormTrack, Tract } from "../types";
 import { evidence, fmt, percentileRanks, rampColor, tractLabel } from "../format";
 import { GoogleMaps } from "./Attribution";
 
@@ -69,9 +69,51 @@ function ServeLines({ lines }: { lines: { from: google.maps.LatLngLiteral; to: g
   return null;
 }
 
-export function MapView({ cfg, data, brief, verifications, highlight, selection, onSelect }: {
+/** GeoJSON Polygon / MultiPolygon rings -> google.maps paths. */
+function rings(g: GeoJsonGeometry | null | undefined): google.maps.LatLngLiteral[][] {
+  if (!g) return [];
+  const toPath = (ring: number[][]) => ring.map(([lng, lat]) => ({ lat, lng }));
+  if (g.type === "Polygon") return (g.coordinates as number[][][]).map(toPath);
+  if (g.type === "MultiPolygon") return (g.coordinates as number[][][][]).flatMap((poly) => poly.map(toPath));
+  return [];
+}
+
+/** Hurricane Ian overlay for the rehearsal step: NHC cone, forecast track, observed best track. */
+function StormLayer({ cone, forecast, best }: { cone: GeoJsonGeometry | null; forecast: { lat: number; lon: number }[]; best: { lat: number; lon: number }[] }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!map) return;
+    const objs: (google.maps.Polygon | google.maps.Polyline)[] = [];
+    const paths = rings(cone);
+    if (paths.length) objs.push(new google.maps.Polygon({ map, paths, strokeColor: "#ec835a", strokeWeight: 2, fillColor: "#ec835a", fillOpacity: 0.12, clickable: false, zIndex: 0 }));
+    if (forecast.length > 1) objs.push(new google.maps.Polyline({ map, path: forecast.map((p) => ({ lat: p.lat, lng: p.lon })), strokeOpacity: 0, zIndex: 1,
+      icons: [{ icon: { path: "M 0,-1 0,1", strokeOpacity: 0.9, strokeColor: "#d03b3b", scale: 3 }, offset: "0", repeat: "12px" }] }));
+    if (best.length > 1) objs.push(new google.maps.Polyline({ map, path: best.map((p) => ({ lat: p.lat, lng: p.lon })), strokeColor: "#7a1f1f", strokeWeight: 3, strokeOpacity: 0.85, zIndex: 1 }));
+    return () => objs.forEach((o) => o.setMap(null));
+  }, [map, cone, forecast, best]);
+  return null;
+}
+
+function Lines({ lines, color, dashed }: { lines: { from: google.maps.LatLngLiteral; to: google.maps.LatLngLiteral }[]; color: string; dashed?: boolean }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!map) return;
+    const polys = lines.map((l) => new google.maps.Polyline({ map, path: [l.from, l.to], strokeColor: color, strokeOpacity: dashed ? 0 : 0.8, strokeWeight: 2, zIndex: 2,
+      icons: dashed ? [{ icon: { path: "M 0,-1 0,1", strokeOpacity: 0.9, strokeColor: color, scale: 2.5 }, offset: "0", repeat: "9px" }] : undefined }));
+    return () => polys.forEach((p) => p.setMap(null));
+  }, [map, lines, color, dashed]);
+  return null;
+}
+
+export interface StepOverlay {
+  step: Step;
+  ranks: { id: string; kind: "tract" | "care_facility"; rank: number; lat: number; lon: number }[];
+  rehearsal: Rehearsal | null; storm: StormTrack | null; advisory: string; alloc: Allocation | null;
+}
+
+export function MapView({ cfg, data, brief, verifications, highlight, selection, onSelect, overlay }: {
   cfg: MapConfig; data: CountyMap | null; brief: Brief | null; verifications: Record<string, ShelterVerification>;
-  highlight: Affected; selection: Selection; onSelect: (s: Selection) => void;
+  highlight: Affected; selection: Selection; onSelect: (s: Selection) => void; overlay: StepOverlay;
 }) {
   const [layers, setLayers] = useState({ tracts: true, shelters: true, care: true, lines: true });
   const [hover, setHover] = useState<Hover>(null);
@@ -79,9 +121,13 @@ export function MapView({ cfg, data, brief, verifications, highlight, selection,
   const hlTracts = useMemo(() => new Set(highlight.tracts), [highlight]);
   const lines = useMemo(() => {
     if (!data || !brief) return [];
-    const byTract = new globalThis.Map(data.tracts.map((t) => [t.geo_id, t]));
+    // A destination serves tracts, or nursing homes ("ccn:<id>") in the medically dependent track.
+    const origin = new globalThis.Map<string, { lat: number; lon: number }>([
+      ...data.tracts.map((t) => [t.geo_id, t] as [string, { lat: number; lon: number }]),
+      ...data.care_facilities.map((c) => [`ccn:${c.ccn}`, c] as [string, { lat: number; lon: number }]),
+    ]);
     return brief.destinations.flatMap((d) => d.serves.flatMap((g) => {
-      const t = byTract.get(g);
+      const t = origin.get(g);
       return t ? [{ from: { lat: t.lat, lng: t.lon }, to: { lat: d.shelter.lat, lng: d.shelter.lon }, dropped: d.verdict === "do_not_rely" }] : [];
     }));
   }, [data, brief]);
@@ -107,7 +153,7 @@ export function MapView({ cfg, data, brief, verifications, highlight, selection,
             <TractDots tracts={data.tracts} highlight={hlTracts} selected={selection?.kind === "tract" ? selection.id : null}
               onHover={(t) => setHover(t ? { kind: "tract", t } : null)} onClick={(id) => onSelect({ kind: "tract", id })} />
           )}
-          {layers.lines && <ServeLines lines={lines} />}
+          {layers.lines && overlay.step === 2 && <ServeLines lines={lines} />}
           {data && layers.shelters && data.shelters.map((s) => {
             const d = dest.get(s.shelter_id) ?? null;
             const v = verifications[s.shelter_id] ?? d?.verification ?? null;
@@ -132,6 +178,29 @@ export function MapView({ cfg, data, brief, verifications, highlight, selection,
               </AdvancedMarker>
             );
           })}
+          {overlay.step === 3 && (() => {
+            const adv = overlay.storm?.advisories.find((x) => x.advisory === overlay.advisory);
+            return <StormLayer cone={overlay.rehearsal?.cone ?? adv?.cone ?? null} forecast={adv?.track ?? []} best={overlay.storm?.best_track ?? []} />;
+          })()}
+          {overlay.step === 3 && overlay.rehearsal && (
+            <Lines color="#eb6834" dashed lines={overlay.rehearsal.reassigned.filter((m) => m.tract_lat != null && m.to_lat != null)
+              .map((m) => ({ from: { lat: m.tract_lat!, lng: m.tract_lon! }, to: { lat: m.to_lat!, lng: m.to_lon! } }))} />
+          )}
+          {overlay.step === 3 && overlay.rehearsal?.shelters_down.concat(overlay.rehearsal.at_risk_not_in_plan).filter((x) => x.lat != null).map((x) => (
+            <AdvancedMarker key={`down-${x.shelter_id}`} position={{ lat: x.lat!, lng: x.lon! }} zIndex={60} onClick={() => onSelect({ kind: "shelter", id: x.shelter_id })} title={x.name}>
+              <div className={`tri${x.in_plan ? "" : " faint"}`} onMouseEnter={() => setHover({ kind: "shelter", id: x.shelter_id, name: x.name, label: x.in_plan ? "Taken offline in the Ian replay" : "At risk, but no capacity on file (not in the plan)", extra: x.evidence })} onMouseLeave={() => setHover(null)}>▲</div>
+            </AdvancedMarker>
+          ))}
+          {overlay.step === 4 && overlay.alloc?.site_options.filter((o) => o.lat != null).map((o, i) => (
+            <AdvancedMarker key={`site-${o.geo_id}`} position={{ lat: o.lat!, lng: o.lon! }} zIndex={70} onClick={() => onSelect({ kind: "tract", id: o.geo_id })}>
+              <div className="site-pin" onMouseEnter={() => setHover({ kind: "shelter", id: o.geo_id, name: i === 0 ? "Designate one site here" : `Next site #${i + 1}`, label: `Seats ${o.persons_covered.toLocaleString()} people without a car`, extra: `${o.tracts_covered.length} neighbourhoods within 15 km` })} onMouseLeave={() => setHover(null)}>★ {o.persons_covered.toLocaleString()}</div>
+            </AdvancedMarker>
+          ))}
+          {overlay.step === 1 && overlay.ranks.map((r) => (
+            <AdvancedMarker key={`rank-${r.id}`} position={{ lat: r.lat, lng: r.lon }} zIndex={80} onClick={() => onSelect({ kind: r.kind === "tract" ? "tract" : "care", id: r.id })}>
+              <div className={`rank-pin${r.kind === "care_facility" ? " must" : ""}`}>{r.rank}</div>
+            </AdvancedMarker>
+          ))}
         </Map>
       </APIProvider>
 
@@ -169,6 +238,8 @@ export function MapView({ cfg, data, brief, verifications, highlight, selection,
           <span><span className="care-pin" style={{ display: "inline-grid", width: 13, height: 13, fontSize: 8 }}>H</span> nursing home</span>
           <span>Circles: tracts, size = households without a car, darker = higher need</span>
           <span>Big pins = in the brief</span>
+          {overlay.step === 3 && <span><b style={{ color: "#d03b3b" }}>▲</b> taken offline · <span style={{ color: "#ec835a" }}>▭</span> NHC cone · dashed: forecast track and re-routed pickups</span>}
+          {overlay.step === 4 && <span><b style={{ color: "#eda100" }}>★</b> where one new site seats the most people</span>}
         </div>
       </div>
     </div>

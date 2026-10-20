@@ -46,6 +46,11 @@ export function FlagChip({ label, value }: { label: string; value: "yes" | "no" 
   );
 }
 
-export const Tag = ({ kind }: { kind: "recorded" | "modeled" | "live" | "county" }) => (
-  <span className={`tag ${kind}`}>{kind === "county" ? "COUNTY-LEVEL" : kind.toUpperCase()}</span>
+export type TagKind = "recorded" | "modeled" | "live" | "county" | "approximate" | "unrecorded";
+const TAG_TEXT: Record<TagKind, string> = {
+  recorded: "RECORDED", modeled: "MODELED", live: "VERIFIED LIVE", county: "COUNTY-LEVEL",
+  approximate: "APPROXIMATE", unrecorded: "NOT RECORDED",
+};
+export const Tag = ({ kind, title }: { kind: TagKind; title?: string }) => (
+  <span className={`tag ${kind}`} title={title}>{TAG_TEXT[kind]}</span>
 );

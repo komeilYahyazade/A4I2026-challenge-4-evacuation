@@ -110,3 +110,38 @@ export interface ChatResponse {
 export type Selection = { kind: "shelter" | "tract" | "care"; id: string } | null;
 export const EMPTY_AFFECTED: Affected = { tracts: [], shelters: [], care_facilities: [] };
 export interface CountiesResponse { state: string; counties: County[] }
+
+// ---- v0.3: allocation, Ian rehearsal, storm track (no Google Maps in any of these) -------------
+export interface AllocTotals { demand_persons: number; assigned_persons: number; unassigned_persons: number; usable_capacity: number; shelters_used: number }
+export interface AllocTract { geo_id: string; lat: number | null; lon: number | null; households_no_vehicle: number; persons_per_household: number | null; demand_persons: number; assigned_persons: number; unassigned_persons: number }
+export interface AllocShelter {
+  shelter_id: string; name: string; lat: number | null; lon: number | null; county_fips: string | null; capacity: number | null;
+  capacity_implausible: boolean; wheelchair_accessible: Flag; generator_onsite: Flag; in_surge_slosh_area: Flag; is_medical: boolean;
+  excluded_reason: string | null; assigned_persons: number; utilization: number | null;
+}
+export interface Assignment { geo_id: string; shelter_id: string; persons: number; straight_line_km: number; mode: "WALK" | "PARATRANSIT" }
+export interface Unplaced { geo_id: string; persons: number; lat: number | null; lon: number | null; reason: "CAPACITY_EXHAUSTED" | "NO_SHELTER_WITHIN_MAX_KM" }
+export interface SiteOption { geo_id: string; lat: number | null; lon: number | null; persons_covered: number; tracts_covered: string[] }
+export interface Allocation {
+  county_fips: string; status: string; max_km: number; shelter_seeking_share: number; totals: AllocTotals; tracts: AllocTract[];
+  shelters: AllocShelter[]; assignments: Assignment[]; unassigned: Unplaced[]; site_options: SiteOption[];
+  excluded_counts: Record<string, number>; rules: Record<string, string>;
+}
+export interface DownShelter { shelter_id: string; name: string; lat: number | null; lon: number | null; reason: "IN_SURGE_ZONE" | "IN_CONE_AND_FLOOD_EXPOSED"; in_plan: boolean; capacity: number | null; evidence: string }
+export interface Reassignment { geo_id: string; from_shelter_id: string; to_shelter_id: string; persons: number; tract_lat: number | null; tract_lon: number | null; to_lat: number | null; to_lon: number | null; from_lat: number | null; from_lon: number | null }
+export interface Rehearsal {
+  county_fips: string;
+  scenario: { id: string; name: string; storm_id: string; landfall_at: string; source: string; advisory: string; issued_at: string | null; hours_before_landfall: number | null };
+  at_risk_total: number; shelters_down: DownShelter[]; at_risk_not_in_plan: DownShelter[]; before: AllocTotals; after: AllocTotals;
+  capacity_lost: number; reassigned: Reassignment[]; reassigned_total: number; newly_unassigned: Unplaced[];
+  cone: GeoJsonGeometry | null; note: string;
+}
+export interface GeoJsonGeometry { type: string; coordinates: unknown }
+export interface TrackPoint { lat: number; lon: number; valid_at?: string | null; wind_kt?: number | null }
+export interface StormTrack {
+  storm_id: string; name: string; landfall_at: string; landfall: LatLon; source: string;
+  advisories: { advisory: string; issued_at: string | null; hours_before_landfall: number | null; cone: GeoJsonGeometry | null; track: TrackPoint[] }[];
+  best_track: TrackPoint[];
+}
+export type Step = 1 | 2 | 3 | 4;
+export type View = "map" | "insights";

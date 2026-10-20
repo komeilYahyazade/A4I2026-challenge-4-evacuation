@@ -1,57 +1,72 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "./api";
+import { CONFIG } from "./config";
 import type {
-  Affected, AuditResponse, BriefStatus, County, CountyInsights, CountyMap, Health, Selection, ShelterVerification,
+  Affected, Allocation, AuditResponse, BriefStatus, County, CountyInsights, CountyMap, Health, Rehearsal, Selection,
+  ShelterVerification, Step, StormTrack, View,
 } from "./types";
 import { EMPTY_AFFECTED } from "./types";
-import { BriefPanel, CountySnapshot } from "./components/BriefPanel";
-import { ChatPanel } from "./components/ChatPanel";
-import { FixList } from "./components/FixList";
+import { AgentDrawer } from "./components/ChatPanel";
+import { Explainer, Header, type BriefControls } from "./components/Header";
 import { InsightsView } from "./components/InsightsView";
-import { MapView, type MapConfig } from "./components/MapView";
-import { Rail, type BriefControls } from "./components/Rail";
+import { MapView } from "./components/MapView";
 import { ShelterPanel } from "./components/ShelterPanel";
+import { StepPanel, whoRows } from "./components/Steps";
 
-type Mode = "brief" | "insights" | "fixes";
-type Tab = "main" | "details" | "chat";
-const cfg: MapConfig = (window as unknown as { __CONFIG__?: MapConfig }).__CONFIG__ ?? {};
 const params = new URLSearchParams(window.location.search);
+const asStep = (v: string | null): Step => (["1", "2", "3", "4"].includes(v ?? "") ? (Number(v) as Step) : 1);
 
 export default function App() {
   const [health, setHealth] = useState<Health | null>(null);
   const [counties, setCounties] = useState<County[]>([]);
   const [county, setCounty] = useState(params.get("county") ?? "12071");
-  const [mode, setMode] = useState<Mode>((params.get("mode") as Mode) ?? "brief");
-  const [tab, setTab] = useState<Tab>("main");
+  const [view, setView] = useState<View>(params.get("view") === "insights" ? "insights" : "map");
+  const [step, setStep] = useState<Step>(asStep(params.get("step")));
+  const [controls, setControls] = useState<BriefControls>({ track: "shelter_readiness", reachKm: 3, maxVerify: 12, routes: true });
   const [map, setMap] = useState<CountyMap | null>(null);
   const [ins, setIns] = useState<CountyInsights | null>(null);
-  const [controls, setControls] = useState<BriefControls>({ track: "shelter_readiness", reachKm: 3, maxVerify: 12, routes: true });
+  const [alloc, setAlloc] = useState<Allocation | null>(null);
+  const [storm, setStorm] = useState<StormTrack | null>(null);
+  const [advisory, setAdvisory] = useState("19");
+  const [rehearsal, setRehearsal] = useState<Rehearsal | null>(null);
   const [briefId, setBriefId] = useState<string | null>(params.get("brief"));
   const [status, setStatus] = useState<BriefStatus | null>(null);
   const [audit, setAudit] = useState<AuditResponse | null>(null);
   const [verifications, setVerifications] = useState<Record<string, ShelterVerification>>({});
   const [selection, setSelection] = useState<Selection>(null);
   const [highlight, setHighlight] = useState<Affected>(EMPTY_AFFECTED);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [explain, setExplain] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const brief = status?.status === "complete" ? status.brief : null;
+  const fail = (what: string) => (e: unknown) => setError(`${what}: ${(e as ApiError).message}`);
 
   useEffect(() => {
-    api.health().then(setHealth).catch((e: ApiError) => setError(`API: ${e.message}`));
-    api.counties().then((r) => setCounties(r.counties)).catch((e: ApiError) => setError(`Counties: ${e.message}`));
-  }, []);
+    api.health().then(setHealth).catch(fail("API"));
+    api.counties().then((r) => setCounties(r.counties)).catch(fail("Counties"));
+    api.storm().then(setStorm).catch(fail("Ian storm track"));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    setMap(null); setSelection(null); setHighlight(EMPTY_AFFECTED);
-    api.countyMap(county).then(setMap).catch((e: ApiError) => setError(`Map: ${e.message}`));
-  }, [county]);
+    setMap(null); setAlloc(null); setRehearsal(null); setSelection(null); setHighlight(EMPTY_AFFECTED);
+    api.countyMap(county).then(setMap).catch(fail("Map"));
+    api.allocation(county).then(setAlloc).catch(fail("Seat plan"));
+  }, [county]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const t = setTimeout(() => {
-      api.insights(county, controls.reachKm).then(setIns).catch((e: ApiError) => setError(`Insights: ${e.message}`));
-    }, 250);
+    const t = setTimeout(() => { api.insights(county, controls.reachKm).then(setIns).catch(fail("Insights")); }, 250);
     return () => clearTimeout(t);
-  }, [county, controls.reachKm]);
+  }, [county, controls.reachKm]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The rehearsal is a deterministic re-solve (no LLM, no Maps): load it when step 3 is open.
+  useEffect(() => {
+    if (step !== 3 || view !== "map") return;
+    let live = true;
+    setRehearsal(null);
+    api.rehearsal(county, advisory).then((r) => live && setRehearsal(r)).catch(fail("Ian rehearsal"));
+    return () => { live = false; };
+  }, [step, view, county, advisory]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Poll the brief every 2 s until it completes or fails.
   useEffect(() => {
@@ -63,102 +78,83 @@ export default function App() {
         if (stop) return;
         setStatus(s);
         if (s.status === "running") setTimeout(tick, 2000);
-        else if (s.status === "complete") api.audit(briefId).then(setAudit).catch(() => setAudit(null));
-      } catch (e) {
-        if (!stop) { setError(`Brief: ${(e as ApiError).message}`); setBriefId(null); }
-      }
+        else if (s.status === "complete") {
+          if (s.brief) setControls((c) => ({ ...c, track: s.brief!.track }));
+          api.audit(briefId).then(setAudit).catch(() => setAudit(null));
+        }
+      } catch (e) { if (!stop) { fail("Brief")(e); setBriefId(null); } }
     };
     setAudit(null);
-    tick();
+    void tick();
     return () => { stop = true; };
-  }, [briefId]);
+  }, [briefId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Keep county, brief and mode in the URL so a refresh reopens the same view.
   useEffect(() => {
-    const p = new URLSearchParams({ county, mode });
+    const p = new URLSearchParams({ county, view, step: String(step) });
     if (briefId) p.set("brief", briefId);
     window.history.replaceState(null, "", `?${p}`);
-  }, [county, briefId, mode]);
+  }, [county, view, step, briefId]);
 
   const generate = async () => {
     setStarting(true); setError(null);
     try {
       const r = await api.createBrief(county, controls.track, controls.reachKm, controls.maxVerify, controls.routes);
-      setStatus(null); setBriefId(r.brief_id); setMode("brief"); setTab("main");
-    } catch (e) { setError(`Could not start the brief: ${(e as ApiError).message}`); } finally { setStarting(false); }
+      setStatus(null); setBriefId(r.brief_id);
+    } catch (e) { fail("Could not start the brief")(e); } finally { setStarting(false); }
   };
-
-  const select = useCallback((s: Selection) => { setSelection(s); setTab("details"); }, []);
+  const select = useCallback((s: Selection) => setSelection(s), []);
   const changeCounty = (fips: string) => {
     setCounty(fips);
     if (status?.brief && status.brief.county.county_fips !== fips) { setBriefId(null); setStatus(null); }
   };
-  const countyName = counties.find((c) => c.county_fips === county)?.name ?? map?.county_fips ?? "";
+  const goStep = (s: Step) => { setStep(s); setSelection(null); setHighlight(EMPTY_AFFECTED); };
+  const countyName = counties.find((c) => c.county_fips === county)?.name ?? "";
+
+  const ranks = useMemo(() => whoRows(brief, controls.track, map).rows.map((r) => ({ id: r.id, kind: r.kind, rank: r.rank, lat: r.lat, lon: r.lon })),
+    [brief, controls.track, map]);
+  const stepData = { step, track: controls.track, reachKm: controls.reachKm, county, countyName, map, ins, alloc, brief, briefId, audit,
+    storm, rehearsal, advisory, verifications, selection };
+  const actions = { goStep, select, highlight: setHighlight, setAdvisory, generate,
+    onVerified: (v: ShelterVerification) => setVerifications((m) => ({ ...m, [v.shelter_id]: v })) };
+  const drawer = chatOpen && <AgentDrawer county={county} briefId={brief ? briefId : null} onHighlight={setHighlight} onClose={() => setChatOpen(false)} />;
 
   return (
     <div className="app">
-      <header className="header">
-        <div className="title">
-          <h1>{countyName ? `${countyName} Readiness Console` : "Readiness Console"}</h1>
-          <p>Where verified, reachable shelters and pickup runs are needed for residents who cannot drive, before the September peak of hurricane season. Planning only.</p>
-        </div>
-        <nav className="modes" aria-label="Views">
-          <button className="mode-btn" aria-pressed={mode === "brief"} onClick={() => { setMode("brief"); setTab("main"); }}>1 · August brief</button>
-          <button className="mode-btn" aria-pressed={mode === "insights"} onClick={() => setMode("insights")}>2 · Insights</button>
-          <button className="mode-btn" aria-pressed={mode === "fixes"} onClick={() => { setMode("fixes"); setTab("main"); }}>3 · Fix list</button>
-          <button className="mode-btn" disabled title="Tier 2: re-match tracts with surge-zone shelters removed (no Google Maps calls). Not built yet.">4 · Ian rehearsal</button>
-        </nav>
-        <div className="right">
-          <select value={county} onChange={(e) => changeCounty(e.target.value)} aria-label="County">
-            {[...counties].sort((a, b) => a.rank - b.rank).map((c) => <option key={c.county_fips} value={c.county_fips}>#{c.rank} {c.name}</option>)}
-          </select>
-          {health && <span className={`badge ${health.mode}`} title={`${health.model} · ${health.dataset}`}>{health.mode === "live" ? "LIVE" : "MOCK"} · {health.model}</span>}
-        </div>
-      </header>
-
-      <div className={`body${mode === "insights" ? " wide" : ""}`}>
-        <Rail controls={controls} setControls={setControls} onGenerate={generate} status={status} busy={starting} />
-        <main className={`main${mode === "insights" ? " scroll" : ""}`}>
-          {error && <div className="map-overlay err" style={{ top: 10, right: 10, zIndex: 9 }} onClick={() => setError(null)}>{error} ✕</div>}
-          {mode === "insights" ? (
+      <Header counties={counties} county={county} onCounty={changeCounty} controls={controls} setControls={setControls}
+        onGenerate={generate} status={status} starting={starting} view={view} setView={setView} step={step} goStep={goStep}
+        health={health} onExplain={() => setExplain(true)} chatOpen={chatOpen} toggleChat={() => setChatOpen(!chatOpen)} />
+      {error && <div className="errors"><div className="error"><span>{error}</span><button className="icon-btn" aria-label="Dismiss" onClick={() => setError(null)}>✕</button></div></div>}
+      {view === "insights" ? (
+        <main className="layout insights">
+          <div className="main scroll">
             <InsightsView ins={ins} map={map} counties={counties} county={county} brief={brief} reachKm={controls.reachKm}
-              onSelectTract={(id) => { setMode("brief"); select({ kind: "tract", id }); }} onCounty={changeCounty} />
-          ) : (
-            <MapView cfg={cfg} data={map} brief={brief} verifications={verifications} highlight={highlight} selection={selection} onSelect={select} />
-          )}
+              onSelectTract={(id) => { setView("map"); setStep(1); select({ kind: "tract", id }); }} onCounty={changeCounty} />
+          </div>
+          {drawer && <aside className="panel floating">{drawer}</aside>}
         </main>
-        {mode !== "insights" && (
-          <section className="panel" aria-label="Details">
-            <div className="tabs" role="tablist">
-              <button className="tab" role="tab" aria-selected={tab === "main"} onClick={() => setTab("main")}>{mode === "fixes" ? "Fix list" : "Brief"}</button>
-              <button className="tab" role="tab" aria-selected={tab === "details"} onClick={() => setTab("details")}>Details</button>
-              <button className="tab" role="tab" aria-selected={tab === "chat"} onClick={() => setTab("chat")}>Chat</button>
-            </div>
-            {tab === "chat" ? (
-              <ChatPanel county={county} briefId={brief ? briefId : null} onHighlight={setHighlight} />
-            ) : (
-              <div className="panel-body">
-                {tab === "details" && (
-                  <ShelterPanel selection={selection} map={map} brief={brief} ins={ins} verifications={verifications} reachKm={controls.reachKm}
-                    onVerified={(v) => setVerifications((m) => ({ ...m, [v.shelter_id]: v }))} onSelect={select} />
-                )}
-                {tab === "main" && mode === "fixes" && <FixList brief={brief} map={map} onHighlight={setHighlight} onSelect={select} />}
-                {tab === "main" && mode === "brief" && (brief ? (
-                  <BriefPanel brief={brief} ins={ins} map={map} audit={audit} reachKm={controls.reachKm} selection={selection}
-                    onSelect={select} onHighlight={setHighlight} onFixList={() => { setMode("fixes"); setTab("main"); }} />
-                ) : (<>
-                  {status?.status === "running" && (
-                    <div className="card"><b>Brief running</b> · {status.progress.message} ({status.progress.done}/{status.progress.total})
-                      <div className="progress" style={{ marginTop: 6 }}><div style={{ width: `${status.progress.total ? (100 * status.progress.done) / status.progress.total : 8}%` }} /></div>
-                      <div className="small muted" style={{ marginTop: 4 }}>About two minutes: each shelter is checked on Google Maps one building at a time.</div></div>
-                  )}
-                  <CountySnapshot ins={ins} map={map} county={countyName} />
-                </>))}
-              </div>
-            )}
-          </section>
-        )}
-      </div>
+      ) : (
+        <main className="layout">
+          <div className="main">
+            <MapView cfg={CONFIG} data={map} brief={brief} verifications={verifications} highlight={highlight} selection={selection} onSelect={select}
+              overlay={{ step, ranks, rehearsal, storm, advisory, alloc }} />
+          </div>
+          <aside className="panel" aria-label="Readiness brief">
+            {drawer || (<>
+              {selection && (
+                <div className="details">
+                  <header className="drawer-head"><h2>Details</h2><button className="icon-btn" aria-label="Close details" onClick={() => setSelection(null)}>✕</button></header>
+                  <div className="details-body">
+                    <ShelterPanel selection={selection} map={map} brief={brief} ins={ins} verifications={verifications} reachKm={controls.reachKm}
+                      onVerified={actions.onVerified} onSelect={select} />
+                  </div>
+                </div>
+              )}
+              <StepPanel d={stepData} a={actions} />
+            </>)}
+          </aside>
+        </main>
+      )}
+      {explain && <Explainer onClose={() => setExplain(false)} />}
     </div>
   );
 }

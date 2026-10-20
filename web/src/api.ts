@@ -1,7 +1,7 @@
 // One function per /v1 route. Same origin: server.py forwards /v1 to the private readiness-api.
 import type {
   ApiErrorBody, AuditResponse, BriefStatus, ChatResponse, CountiesResponse, CountyInsights, CountyMap,
-  Health, ShelterDetail, ShelterVerification, Track,
+  Allocation, Health, Rehearsal, ShelterDetail, ShelterVerification, StormTrack, Track,
 } from "./types";
 
 export class ApiError extends Error {
@@ -35,6 +35,9 @@ export const api = {
   countyMap: (fips: string) => call<CountyMap>("GET", `/v1/counties/${fips}/map`),
   insights: (fips: string, reachKm: number) =>
     call<CountyInsights>("GET", `/v1/counties/${fips}/insights?reachable_km=${reachKm}`),
+  allocation: (fips: string) => call<Allocation>("GET", `/v1/counties/${fips}/allocation`),
+  rehearsal: (fips: string, advisory: string) => call<Rehearsal>("GET", `/v1/counties/${fips}/rehearsal?advisory=${advisory}`),
+  storm: () => call<StormTrack>("GET", "/v1/storms/ian_2022"),
   shelter: (id: string) => call<ShelterDetail>("GET", `/v1/shelters/${id}`),
   verify: (id: string, fromGeoId: string | null) =>
     call<ShelterVerification>("POST", `/v1/shelters/${id}/verify`, { from_geo_id: fromGeoId, include_route: !!fromGeoId }),
