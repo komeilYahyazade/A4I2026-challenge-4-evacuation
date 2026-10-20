@@ -1,0 +1,205 @@
+{
+  "_fixture": true,
+  "_note": "Approximate cone and track for UI work; real NHC geometry comes from readiness_ops.storm_advisories.",
+  "payload_type": "storm_track.v1",
+  "schema_version": 1,
+  "storm_id": "AL092022",
+  "name": "Ian",
+  "landfall_at": "2022-09-28T19:05:00Z",
+  "landfall": {
+    "lat": 26.7,
+    "lng": -82.2
+  },
+  "source": "NOAA NHC GIS archive (public domain); landfall per NHC Tropical Cyclone Report AL092022",
+  "advisories": [
+    {
+      "advisory": "18",
+      "issued_at": "2022-09-26T03:00:00Z",
+      "hours_before_landfall": null,
+      "cone": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -84.6,
+              23.6
+            ],
+            [
+              -83.9,
+              24.9
+            ],
+            [
+              -83.2,
+              25.9
+            ],
+            [
+              -82.6,
+              26.6
+            ],
+            [
+              -82.0,
+              27.3
+            ],
+            [
+              -81.3,
+              28.0
+            ],
+            [
+              -80.9,
+              28.6
+            ],
+            [
+              -81.7,
+              29.0
+            ],
+            [
+              -82.4,
+              28.3
+            ],
+            [
+              -83.0,
+              27.5
+            ],
+            [
+              -83.6,
+              26.6
+            ],
+            [
+              -84.3,
+              25.6
+            ],
+            [
+              -85.1,
+              24.3
+            ],
+            [
+              -84.6,
+              23.6
+            ]
+          ]
+        ]
+      },
+      "track": [
+        {
+          "lat": 24.5,
+          "lng": -83.3,
+          "valid_at": "2022-09-27T12:00:00Z",
+          "wind_kt": 105
+        },
+        {
+          "lat": 25.6,
+          "lng": -82.7,
+          "valid_at": "2022-09-28T00:00:00Z",
+          "wind_kt": 120
+        },
+        {
+          "lat": 26.7,
+          "lng": -82.2,
+          "valid_at": "2022-09-28T19:05:00Z",
+          "wind_kt": 130
+        },
+        {
+          "lat": 27.4,
+          "lng": -81.6,
+          "valid_at": "2022-09-29T06:00:00Z",
+          "wind_kt": 65
+        }
+      ]
+    },
+    {
+      "advisory": "22",
+      "issued_at": "2022-09-27T15:00:00Z",
+      "hours_before_landfall": null,
+      "cone": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -84.6,
+              23.6
+            ],
+            [
+              -83.9,
+              24.9
+            ],
+            [
+              -83.2,
+              25.9
+            ],
+            [
+              -82.6,
+              26.6
+            ],
+            [
+              -82.0,
+              27.3
+            ],
+            [
+              -81.3,
+              28.0
+            ],
+            [
+              -80.9,
+              28.6
+            ],
+            [
+              -81.7,
+              29.0
+            ],
+            [
+              -82.4,
+              28.3
+            ],
+            [
+              -83.0,
+              27.5
+            ],
+            [
+              -83.6,
+              26.6
+            ],
+            [
+              -84.3,
+              25.6
+            ],
+            [
+              -85.1,
+              24.3
+            ],
+            [
+              -84.6,
+              23.6
+            ]
+          ]
+        ]
+      },
+      "track": [
+        {
+          "lat": 24.5,
+          "lng": -83.3,
+          "valid_at": "2022-09-27T12:00:00Z",
+          "wind_kt": 105
+        },
+        {
+          "lat": 25.6,
+          "lng": -82.7,
+          "valid_at": "2022-09-28T00:00:00Z",
+          "wind_kt": 120
+        },
+        {
+          "lat": 26.7,
+          "lng": -82.2,
+          "valid_at": "2022-09-28T19:05:00Z",
+          "wind_kt": 130
+        },
+        {
+          "lat": 27.4,
+          "lng": -81.6,
+          "valid_at": "2022-09-29T06:00:00Z",
+          "wind_kt": 65
+        }
+      ]
+    }
+  ],
+  "best_track": []
+}
