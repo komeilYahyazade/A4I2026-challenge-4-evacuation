@@ -11,12 +11,18 @@ apply to every file.
   `.venv/bin/python scripts/setup_bq.py` after any data reload.
 - `agent/readiness_agent/` – ADK agents (`agent.py`), prompts, tools. Facts are one state key each
   (`tools/facts.py`) so parallel tool calls never race. `brief_plan.py` decides which ids and numbers a
-  brief shows.
+  brief shows, and defines the three tracks (`TRACKS`); the analyst's steps differ per track
+  (`prompts.analyst_instruction`). `plan.py` is the OR-Tools seat allocator and Hurricane Ian rehearsal,
+  ported from main's `agent/allocate.py` / `agent/rehearse.py` (never Google Maps).
+- `agent/readiness_voice/` – the Gemini Live voice app (ADK `/run_live`), same tools as chat.
 - `api/` – FastAPI: ADK routes + `/v1`. `briefs.py` assembles briefs (numbers from facts, words from the
   writer, guards against invented ids/numbers and over-generous verdicts). `chat.py` runs chat.
-- `web/` – React console (Vite + TypeScript, Google Maps via `@vis.gl/react-google-maps`). `server.py`
-  serves the build plus `/config.js` (Maps browser key from env) and forwards `/v1` to the private API
-  with its service-account ID token. Deployed as Cloud Run `readiness-console`.
+- `web/` – React console (Vite + TypeScript, Google Maps via `@vis.gl/react-google-maps`), laid out like
+  main's console: county / track / Generate brief top left, Map | Insights toggle, the four steps
+  (who can't leave, where they'd go, Ian rehearsal, what to fix), "Ask the agent" drawer with voice.
+  `server.py` serves the build plus `/config.js` (Maps browser key from env), forwards `/v1` to the
+  private API with its service-account ID token, and bridges the `/run_live` voice websocket.
+  Deployed as Cloud Run `readiness-console`.
   Build: `cd web && PATH=$PWD/../.node/bin:$PATH npm run build` (Node is project-local in `.node/`).
 - `frontend/` – the earlier Streamlit UI (`readiness-ui`), kept as a backup.
 
@@ -36,3 +42,10 @@ belong to teammates). Ours: `readiness-api`, `readiness-ui`, `readiness-console`
   exhaust the Gemini per-minute token quota.
 - ACS `median_income` uses -666666666 as a sentinel. Null it at the SQL boundary.
 - Never commit real Maps responses as fixtures (rule 10). Test fixtures are synthetic.
+- The Ian rehearsal reads the data lane's NHC tables in `readiness_ops` (storm_advisories,
+  storm_best_track). Read only: never write to `readiness_ops`.
+- Seat numbers match main because edges cap each tract at its 15 nearest pre-landfall shelters
+  (sql/15); without the cap Lee shows ~700 unseated instead of ~5,600.
+- Pin `ortools==9.15.6755`: older OR-Tools downgrades protobuf below what google-api-core needs.
+- Local testing: run the web server on :5173 (an allowed Maps key referrer). :8090 and :8601 are
+  used by people's `gcloud run services proxy` sessions; never kill processes you did not start.
