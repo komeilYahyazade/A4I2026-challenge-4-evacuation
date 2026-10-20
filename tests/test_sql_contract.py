@@ -50,6 +50,7 @@ def test_flags_stay_three_state_in_every_shelter_query():
             assert f"IFNULL(s.{flag}" not in sql, f"{name} collapses {flag}"
         assert "'UNRECORDED'" in sql
         assert "AS capacity_status" in sql
+        assert "s.evacuation_capacity < 0 THEN 'UNRECORDED'" in sql, f"{name} counts a negative capacity"
         assert r"r'\b(INACTIVE|CLOSED|DEMOLISHED|DO NOT USE)\b')" in sql
         assert "IFNULL(s.usage IN UNNEST(@pre_landfall_usage), FALSE) AS is_pre_landfall" in sql
 

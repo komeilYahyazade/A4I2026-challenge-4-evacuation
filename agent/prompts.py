@@ -26,7 +26,7 @@ WHICH TOOL
 - Whether the plan lands fairly: audit_equity. Race is only ever used to audit, never to rank.
 - Who goes where within shelter capacity, and what demand is left over: allocate_county. Straight-line, no Google Maps; it names unplaced demand and the assigned shelters nobody has assessed.
 - A tabletop rehearsal of Hurricane Ian that takes shelters offline and re-solves: rehearse. It never uses Google Maps, and you must not cite Google Maps facts in that turn.
-- Raw registry rows by county or tract, when asked: the toolbox tools, if present. The bigquery tools, if present, run read-only queries against the evacuation_readiness dataset; prefer the purpose-built tools above.
+- Raw registry rows by county or tract, when asked: the toolbox tools, if present. The bigquery tools, if present, run read-only SQL; query the readiness_ops views named below, not the raw tables, and prefer the purpose-built tools above. A number you get from your own SQL is not from a purpose-built tool, so say which query it came from.
 - One place, one question, conversationally: google_maps. Ask about ONE named building at ONE address. Never ask Google Maps an area question like "which shelters take a wheelchair"; it cannot answer that and will describe the wrong kind of shelter.
 - Drive time when verify_shelters returned none: compute_routes, if present. Say which source the time came from.
 

@@ -20,8 +20,8 @@ SHELTER_COLUMNS = """
   s.evacuation_capacity,
   s.post_impact_capacity,
   -- Blank capacity, or 0 on a shelter that is (or may be) pre-landfall, means nobody recorded it.
-  -- A 0 on a POST-only shelter is a legitimate value.
-  CASE WHEN s.evacuation_capacity IS NULL THEN 'UNRECORDED'
+  -- A 0 on a POST-only shelter is a legitimate value. A negative number (FEMA's -1) never is.
+  CASE WHEN s.evacuation_capacity IS NULL OR s.evacuation_capacity < 0 THEN 'UNRECORDED'
        WHEN s.evacuation_capacity = 0 AND IFNULL(s.usage IN UNNEST(@pre_landfall_usage), TRUE) THEN 'UNRECORDED'
        ELSE 'RECORDED' END AS capacity_status,
   IFNULL(s.evacuation_capacity > @capacity_max, FALSE) AS capacity_implausible,

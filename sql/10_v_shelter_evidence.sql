@@ -22,11 +22,12 @@ SELECT
   s.evacuation_capacity,
   s.post_impact_capacity,
   -- A 0 on a POST shelter is real (it carries post_impact_capacity instead). A 0 or NULL on a
-  -- shelter used before landfall means the number was never filled in.
-  CASE WHEN s.evacuation_capacity IS NULL THEN NULL
+  -- shelter used before landfall means the number was never filled in. A negative number (FEMA
+  -- files -1 in some states) is never a capacity: unrecorded, and kept out of every SUM.
+  CASE WHEN s.evacuation_capacity IS NULL OR s.evacuation_capacity < 0 THEN NULL
        WHEN s.evacuation_capacity = 0 AND IFNULL(TRIM(s.usage) IN (${PRE_LANDFALL}), TRUE) THEN NULL
        ELSE CAST(s.evacuation_capacity AS INT64) END AS capacity,
-  CASE WHEN s.evacuation_capacity IS NULL THEN 'UNRECORDED'
+  CASE WHEN s.evacuation_capacity IS NULL OR s.evacuation_capacity < 0 THEN 'UNRECORDED'
        WHEN s.evacuation_capacity = 0 AND IFNULL(TRIM(s.usage) IN (${PRE_LANDFALL}), TRUE) THEN 'UNRECORDED'
        ELSE 'RECORDED' END AS capacity_status,
   IFNULL(s.evacuation_capacity > ${CAPACITY_MAX}, FALSE) AS capacity_implausible,
@@ -43,6 +44,13 @@ SELECT
   -- FEMA's own name field says so ("INACTIVE - ...", "(CLOSED)", "Do Not Use"): 148 rows in FL, 24
   -- still marked EVAC/BOTH. Flagged, never dropped: the record is FEMA's, the check is Maps'.
   -- Same expression as agent/queries.py SHELTER_COLUMNS, so both report the same count.
-  REGEXP_CONTAINS(UPPER(IFNULL(s.shelter_name, '')), r'\b(INACTIVE|CLOSED|DEMOLISHED|DO NOT USE)\b') AS name_says_inactive
+  REGEXP_CONTAINS(UPPER(IFNULL(s.shelter_name, '')), r'\b(INACTIVE|CLOSED|DEMOLISHED|DO NOT USE)\b') AS name_says_inactive,
+  -- The same building filed more than once: same name and address after TRIM and UPPER (the
+  -- notebook's grain check, 25 groups in FL). Flagged, never dropped. The lowest shelter_id in a
+  -- group is the record we keep counting; the others carry is_duplicate_record = TRUE.
+  COUNT(*) OVER (PARTITION BY UPPER(TRIM(IFNULL(s.shelter_name, ''))), UPPER(TRIM(IFNULL(s.address_1, ''))))
+    AS duplicate_group_size,
+  ROW_NUMBER() OVER (PARTITION BY UPPER(TRIM(IFNULL(s.shelter_name, ''))), UPPER(TRIM(IFNULL(s.address_1, '')))
+                     ORDER BY s.shelter_id) > 1 AS is_duplicate_record
 FROM `${PROJECT}.${SRC}.shelters` AS s
 WHERE s.latitude IS NOT NULL AND s.longitude IS NOT NULL;

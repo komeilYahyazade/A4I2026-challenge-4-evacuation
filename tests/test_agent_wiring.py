@@ -31,6 +31,14 @@ def test_instruction_names_the_bigquery_project_and_datasets():
         assert "{" not in agent.instruction and "}" not in agent.instruction
 
 
+def test_instruction_points_free_sql_at_the_views_not_the_raw_tables():
+    # execute_sql_readonly on raw shelters skips the views' rules (unrecorded capacity, inactive names).
+    agent = build_root_agent(AgentConfig(project_id="demo-project"))
+    for view in ("v_shelter_evidence", "v_county_shelter_summary", "v_tract_need"):
+        assert f"demo-project.readiness_ops.{view}" in agent.instruction
+    assert "demo-project.evacuation_readiness.shelters" not in agent.instruction
+
+
 def test_instruction_names_the_default_county_for_unscoped_questions():
     # The console's suggestions ("Which of my shelters...") name no county.
     agent = build_root_agent(AgentConfig(project_id="demo-project", default_county_fips="12071"))

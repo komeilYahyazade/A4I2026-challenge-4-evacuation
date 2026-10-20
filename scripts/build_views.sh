@@ -40,9 +40,10 @@ WALK_KM="$(threshold WALK_KM)"
 PROXY_KM="$(threshold PARATRANSIT_PROXY_KM)"
 CAR_KM="$(threshold CAR_KM)"
 CAPACITY_MAX="$(threshold CAPACITY_PLAUSIBLE_MAX)"
+FLOOD_SHARE="$(threshold SITE_FLOOD_SHARE_HIGH)"
 # ("EVAC", "BOTH") -> 'EVAC', 'BOTH'
 PRE_LANDFALL="$(threshold PRE_LANDFALL_USAGE | tr -d '()' | tr '"' "'" | sed -E "s/, *\$//")"
-echo "  thresholds: walk ${WALK_KM} km, run ${PROXY_KM} km, search ${CAR_KM} km, pre-landfall ${PRE_LANDFALL}"
+echo "  thresholds: walk ${WALK_KM} km, run ${PROXY_KM} km, search ${CAR_KM} km, site flood share ${FLOOD_SHARE}, pre-landfall ${PRE_LANDFALL}"
 
 files=("$@")
 [[ ${#files[@]} -gt 0 ]] || files=(sql/*.sql)
@@ -56,6 +57,7 @@ for f in "${files[@]}"; do
              -e "s/\${PROXY_KM}/${PROXY_KM}/g" \
              -e "s/\${CAR_KM}/${CAR_KM}/g" \
              -e "s/\${CAPACITY_MAX}/${CAPACITY_MAX}/g" \
+             -e "s/\${FLOOD_SHARE}/${FLOOD_SHARE}/g" \
              -e "s/\${PRE_LANDFALL}/${PRE_LANDFALL}/g" "${f}")"
   if out="$(bq --project_id="${PROJECT}" --location="${LOCATION}" query \
               --use_legacy_sql=false --format=none <<<"${sql}" 2>&1)"; then

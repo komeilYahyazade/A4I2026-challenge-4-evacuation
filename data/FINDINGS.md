@@ -62,6 +62,15 @@ persons per household, with group quarters excluded). Lee's pre-landfall shelter
 
 ## Notes for the deck
 
+- **The 36,800 is an upper-leaning estimate.** It multiplies Lee's no-car households by the tract's *average*
+  household size. Households without a car skew smaller (older people living alone), so the true number is
+  probably lower. Quote it as "about", give the direction, and lead with the 14,553 households, which is counted.
+- **Who is not in that number.** Tracts with residents but no households (only group quarters: dorms, prisons,
+  nursing homes) get no estimate. Nursing homes are covered separately (20 homes, 2,177 beds); the rest are not.
+- **Some shelter rows are the same building filed twice** (25 name+address groups statewide). They are flagged
+  (`is_duplicate_record`) and still counted, so check `pre_landfall_duplicate_records` before quoting Lee's
+  34,000 spaces.
+
 - `pct_disability` is CDC SVI (an ACS estimate), so it is RECORDED. CDC PLACES measures (`pct_mobility`, etc.)
   are MODELED.
 - "Not in the surge zone" is never true just because the flag is blank: 81 of 84 are blank.
