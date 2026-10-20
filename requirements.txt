@@ -1,0 +1,5 @@
+google-adk>=2.12,<3
+google-genai>=2.30,<3
+google-cloud-bigquery>=3.25,<4
+mcp>=1.24,<3
+ortools>=9.12,<10

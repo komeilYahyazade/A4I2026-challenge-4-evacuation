@@ -24,3 +24,8 @@ Thumbs.db
 data/*.parquet
 data/*.csv
 data/*.csv.gz
+.gstack/
+
+# ADK local session store (may hold Google Maps content; never commit or ship)
+agent/.adk/
+**/.adk/
