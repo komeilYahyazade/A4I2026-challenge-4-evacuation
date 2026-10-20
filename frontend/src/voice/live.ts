@@ -68,6 +68,10 @@ export class LiveVoice {
   }
 
   private async openMic(): Promise<void> {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      this.set("error");
+      throw new Error("This browser cannot use a microphone here (it needs a mic and a secure page). Type your question below instead.");
+    }
     try {
       // Mic first, so a denied permission fails fast with a clear message.
       this.stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
@@ -77,9 +81,9 @@ export class LiveVoice {
       throw new Error(
         name === "NotAllowedError" || name === "SecurityError"
           ? "Microphone permission was denied. Allow the microphone for this site in the browser's address bar, then try again."
-          : name === "NotFoundError"
-            ? "No microphone found."
-            : `Microphone error: ${(e as Error).message}`,
+          : name === "NotFoundError" || name === "NotSupportedError" || name === "NotReadableError"
+            ? "No usable microphone found. Type your question below instead."
+            : `Microphone error: ${(e as Error).message}. Type your question below instead.`,
       );
     }
     this.micCtx = new AudioContext();

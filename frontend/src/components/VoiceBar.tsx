@@ -78,23 +78,21 @@ export function VoiceBar() {
     for (const p of parts) {
       const fr = (p.functionResponse || p.function_response) as { response?: Record<string, unknown> } | undefined;
       if (fr) {
+        // Tool results update the map now; their Maps sources wait for the spoken answer they support.
         const { sources } = act.ingestToolResponse(fr.response);
         t.sources = dedupe([...t.sources, ...sources]);
-        ensureAgent();
       }
     }
     const grounding = groundingToSources(ev as AdkEvent);
-    if (grounding.length) {
-      t.sources = dedupe([...t.sources, ...grounding]);
-      ensureAgent();
-    }
+    if (grounding.length) t.sources = dedupe([...t.sources, ...grounding]);
     if (outT?.text) {
       ensureAgent();
       t.userId = null; // the user's turn is over once the agent answers
       t.agentText = final ? outT.text : t.agentText + outT.text;
     }
     if (t.agentId) d({ type: "chatPatch", id: t.agentId, patch: { text: t.agentText.trim() || "…", toolSources: t.sources } });
-    if (ev.turnComplete || ev.turn_complete) {
+    // turnComplete comes twice: after the tool round (nothing said yet) and after the spoken answer.
+    if ((ev.turnComplete || ev.turn_complete) && t.agentText.trim()) {
       t.userId = null;
       t.agentId = null;
       t.agentText = "";
