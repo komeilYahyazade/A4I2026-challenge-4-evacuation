@@ -1,19 +1,15 @@
-.git
+# Source uploaded by `gcloud run deploy --source .`
+.git/
+.gitignore
+.venv/
 .env
-agent/.env
-**/__pycache__
-**/*.pyc
+.adk/
+**/.adk/
+__pycache__/
+*.pyc
+.docx/
 notebooks/
 tests/
-docs/
-data/
-.venv/
 frontend/
-contract/
-sql/
-toolbox/
-node_modules/
-
-# ADK local session store (may hold Google Maps content; never commit or ship)
-agent/.adk/
-**/.adk/
+data/
+scripts/

@@ -1,0 +1,141 @@
+{
+ "county_fips": "12071",
+ "status": "OPTIMAL",
+ "max_km": 15.0,
+ "shelter_seeking_share": 1.0,
+ "totals": {
+  "demand_persons": 1400,
+  "assigned_persons": 900,
+  "unassigned_persons": 500,
+  "usable_capacity": 900,
+  "shelters_used": 2
+ },
+ "tracts": [
+  {
+   "geo_id": "12071000100",
+   "lat": 26.6,
+   "lon": -81.85,
+   "households_no_vehicle": 400,
+   "persons_per_household": 2.5,
+   "demand_persons": 1000,
+   "assigned_persons": 900,
+   "unassigned_persons": 100
+  },
+  {
+   "geo_id": "12071000200",
+   "lat": 26.7,
+   "lon": -81.95,
+   "households_no_vehicle": 200,
+   "persons_per_household": 2.0,
+   "demand_persons": 400,
+   "assigned_persons": 0,
+   "unassigned_persons": 400
+  }
+ ],
+ "shelters": [
+  {
+   "shelter_id": "S1",
+   "name": "Example Elementary",
+   "lat": 26.62,
+   "lon": -81.86,
+   "county_fips": "12071",
+   "capacity": 600,
+   "capacity_implausible": false,
+   "wheelchair_accessible": "unrecorded",
+   "generator_onsite": "yes",
+   "in_surge_slosh_area": "no",
+   "is_medical": false,
+   "excluded_reason": null,
+   "assigned_persons": 600,
+   "utilization": 1.0
+  },
+  {
+   "shelter_id": "S2",
+   "name": "Example High",
+   "lat": 26.62,
+   "lon": -81.86,
+   "county_fips": "12071",
+   "capacity": 300,
+   "capacity_implausible": false,
+   "wheelchair_accessible": "unrecorded",
+   "generator_onsite": "yes",
+   "in_surge_slosh_area": "no",
+   "is_medical": false,
+   "excluded_reason": null,
+   "assigned_persons": 300,
+   "utilization": 1.0
+  },
+  {
+   "shelter_id": "S3",
+   "name": "Example Church",
+   "lat": 26.62,
+   "lon": -81.86,
+   "county_fips": "12071",
+   "capacity": null,
+   "capacity_implausible": false,
+   "wheelchair_accessible": "unrecorded",
+   "generator_onsite": "yes",
+   "in_surge_slosh_area": "no",
+   "is_medical": false,
+   "excluded_reason": "CAPACITY_UNRECORDED",
+   "assigned_persons": 0,
+   "utilization": null
+  }
+ ],
+ "assignments": [
+  {
+   "geo_id": "12071000100",
+   "shelter_id": "S1",
+   "persons": 600,
+   "straight_line_km": 1.2,
+   "mode": "WALK"
+  },
+  {
+   "geo_id": "12071000100",
+   "shelter_id": "S2",
+   "persons": 300,
+   "straight_line_km": 4.0,
+   "mode": "PARATRANSIT"
+  }
+ ],
+ "unassigned": [
+  {
+   "geo_id": "12071000200",
+   "persons": 400,
+   "lat": 26.7,
+   "lon": -81.95,
+   "reason": "CAPACITY_EXHAUSTED"
+  },
+  {
+   "geo_id": "12071000100",
+   "persons": 100,
+   "lat": 26.6,
+   "lon": -81.85,
+   "reason": "CAPACITY_EXHAUSTED"
+  }
+ ],
+ "site_options": [
+  {
+   "geo_id": "12071000200",
+   "lat": 26.7,
+   "lon": -81.95,
+   "persons_covered": 500,
+   "tracts_covered": [
+    "12071000100",
+    "12071000200"
+   ]
+  }
+ ],
+ "excluded_counts": {
+  "CAPACITY_UNRECORDED": 1
+ },
+ "rules": {
+  "demand": "households_no_vehicle x persons per household (group quarters excluded) x shelter_seeking_share",
+  "capacity": "FEMA evacuation_capacity as filed; unrecorded or implausible capacity excluded, never assumed",
+  "cost": "straight-line person-km; recorded accessibility is not rewarded",
+  "distance": "Straight line (a lower bound on road distance)",
+  "solver": "OR-Tools SimpleMinCostFlow"
+ },
+ "maps_used": false,
+ "freshness": "historical"
+}

@@ -1,0 +1,138 @@
+"""The nine /v1 routes (BUILD_SPEC.md section 10). Each route serves its mock until it is live.
+
+Live implementations are imported inside the handler so a mock-only deploy never loads BigQuery
+or the agents.
+"""
+
+from fastapi import APIRouter
+
+from api import config, mocks
+from api.errors import ApiError
+from contract import schemas
+
+router = APIRouter(prefix="/v1")
+
+
+def _check_fips(county_fips: str) -> None:
+    if not (len(county_fips) == 5 and county_fips.isdigit()):
+        raise ApiError(400, "invalid_county_fips", f"{county_fips!r} is not a 5-digit county FIPS")
+
+
+@router.get("/health", response_model=schemas.Health)
+def health():
+    return {"status": "ok", "mode": config.mode(), "model": config.MODEL, "state": config.STATE,
+            "dataset": config.DATASET, "version": config.VERSION}
+
+
+@router.get("/counties", response_model=schemas.CountiesResponse)
+def counties():
+    if not config.is_live("counties"):
+        return mocks.mock("counties.json")
+    from api import data
+    return data.counties()
+
+
+@router.get("/counties/{county_fips}/map", response_model=schemas.CountyMap)
+def county_map(county_fips: str):
+    _check_fips(county_fips)
+    if not config.is_live("map"):
+        return mocks.mock("county_map.json")
+    from api import data
+    return data.county_map(county_fips)
+
+
+@router.get("/counties/{county_fips}/insights", response_model=schemas.CountyInsights)
+def county_insights(county_fips: str, reachable_km: float = 3.0):
+    _check_fips(county_fips)
+    if not 0.5 <= reachable_km <= 25:
+        raise ApiError(400, "invalid_reachable_km", "reachable_km must be between 0.5 and 25")
+    if not config.is_live("insights"):
+        return mocks.mock("insights.json")
+    from api import data
+    return data.insights(county_fips, round(reachable_km, 1))
+
+
+@router.get("/counties/{county_fips}/allocation", response_model=schemas.Allocation)
+def county_allocation(county_fips: str, max_km: float = 15.0):
+    """Who goes where within recorded capacity (OR-Tools min-cost flow, straight line, no Maps)."""
+    _check_fips(county_fips)
+    if not 1 <= max_km <= 40:
+        raise ApiError(400, "invalid_max_km", "max_km must be between 1 and 40")
+    if not config.is_live("plan"):
+        return mocks.mock("allocation.json")
+    from api import data
+    return data.allocation(county_fips, round(max_km, 1))
+
+
+@router.get("/counties/{county_fips}/rehearsal", response_model=schemas.Rehearsal)
+def county_rehearsal(county_fips: str, advisory: str = "19"):
+    """Hurricane Ian tabletop replay at one NHC advisory: shelters offline, re-solve, diff. No Maps."""
+    _check_fips(county_fips)
+    if not config.is_live("plan"):
+        return mocks.mock("rehearsal.json")
+    from api import data
+    return data.rehearsal(county_fips, advisory)
+
+
+@router.get("/storms/ian_2022", response_model=schemas.StormTrack)
+def storm_ian():
+    if not config.is_live("plan"):
+        return mocks.mock("storm.json")
+    from api import data
+    return data.storm()
+
+
+@router.get("/shelters/{shelter_id}", response_model=schemas.ShelterDetail)
+def shelter(shelter_id: str):
+    if not config.is_live("shelter"):
+        return mocks.mock("shelter.json")
+    from api import data
+    return data.shelter_detail(shelter_id)
+
+
+@router.post("/shelters/{shelter_id}/verify", response_model=schemas.ShelterVerification)
+async def verify(shelter_id: str, req: schemas.VerifyRequest | None = None):
+    req = req or schemas.VerifyRequest()
+    if not config.is_live("verify"):
+        return mocks.mock("verify.json")
+    from api import data
+    return await data.verify(shelter_id, req)
+
+
+@router.post("/briefs", response_model=schemas.BriefAccepted, status_code=202)
+async def create_brief(req: schemas.BriefRequest):
+    _check_fips(req.county_fips)
+    if not config.is_live("briefs"):
+        return mocks.start_brief()
+    from api import briefs
+    return await briefs.start(req)
+
+
+@router.get("/briefs/{brief_id}", response_model=schemas.BriefStatus)
+def get_brief(brief_id: str):
+    if not config.is_live("briefs"):
+        body = mocks.brief_status(brief_id)
+    else:
+        from api import briefs
+        body = briefs.status(brief_id)
+    if body is None:
+        raise ApiError(404, "brief_not_found", f"No brief {brief_id} (jobs live in memory and expire)")
+    return body
+
+
+@router.get("/briefs/{brief_id}/audit", response_model=schemas.AuditResponse)
+def audit(brief_id: str):
+    if not config.is_live("audit"):
+        body = mocks.mock("audit.json")
+        body["brief_id"] = brief_id
+        return body
+    from api import briefs
+    return briefs.audit(brief_id)
+
+
+@router.post("/chat", response_model=schemas.ChatResponse)
+async def chat(req: schemas.ChatRequest):
+    if not config.is_live("chat"):
+        return mocks.mock("chat.json")
+    from api import chat as chat_impl
+    return await chat_impl.chat(req)

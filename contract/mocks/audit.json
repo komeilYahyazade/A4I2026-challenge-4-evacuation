@@ -1,0 +1,12 @@
+{
+  "brief_id": "brf_01JB7X",
+  "compares": "Tracts in who_cannot_leave against every tract in the county and the state",
+  "rows": [
+    {"metric": "poverty_rate", "unit": "%", "recommended": 24.1, "county": 13.2, "state": 12.7, "used_as_input": false},
+    {"metric": "pct_limited_english", "unit": "%", "recommended": 9.8, "county": 5.1, "state": 6.5, "used_as_input": false},
+    {"metric": "shelters_access_unrecorded", "unit": "%", "recommended": 85, "county": 85, "state": 88, "used_as_input": false},
+    {"metric": "pct_black", "unit": "%", "recommended": 31.0, "county": 8.9, "state": 15.1, "used_as_input": false},
+    {"metric": "pct_hispanic", "unit": "%", "recommended": 27.4, "county": 23.0, "state": 26.8, "used_as_input": false}
+  ],
+  "finding": null
+}

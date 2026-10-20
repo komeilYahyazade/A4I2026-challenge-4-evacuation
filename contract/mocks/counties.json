@@ -1,0 +1,25 @@
+{
+  "state": "FL",
+  "counties": [
+    {
+      "county_fips": "12071",
+      "name": "Lee County",
+      "rank": 1,
+      "need_score": 0.91,
+      "exposure_score": 0.97,
+      "total_pop": 760822,
+      "shelters": {"total": 74, "medical_needs": 3, "in_surge_zone": 11, "wheelchair": {"yes": 9, "no": 2, "unrecorded": 63}},
+      "center": {"lat": 26.57, "lon": -81.87}
+    },
+    {
+      "county_fips": "12015",
+      "name": "Charlotte County",
+      "rank": 2,
+      "need_score": 0.84,
+      "exposure_score": 0.9,
+      "total_pop": 186847,
+      "shelters": {"total": 21, "medical_needs": 1, "in_surge_zone": 4, "wheelchair": {"yes": 2, "no": 1, "unrecorded": 18}},
+      "center": {"lat": 26.9, "lon": -81.94}
+    }
+  ]
+}

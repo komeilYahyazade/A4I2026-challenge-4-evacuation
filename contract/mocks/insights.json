@@ -1,0 +1,149 @@
+{
+ "county_fips": "12071",
+ "name": "Lee County",
+ "reachable_km": 3.0,
+ "shelters": {
+  "total": 74,
+  "evac": 50,
+  "medical_needs": 3,
+  "capacity_recorded": 30000,
+  "capacity_unrecorded": 12,
+  "capacity_implausible": 0,
+  "verified_on_maps": 2
+ },
+ "flags": [
+  {
+   "scope": "all",
+   "flag": "wheelchair_accessible",
+   "yes": 9,
+   "no": 2,
+   "unrecorded": 63
+  },
+  {
+   "scope": "all",
+   "flag": "generator_onsite",
+   "yes": 5,
+   "no": 0,
+   "unrecorded": 69
+  },
+  {
+   "scope": "all",
+   "flag": "self_sufficient_electricity",
+   "yes": 2,
+   "no": 0,
+   "unrecorded": 72
+  },
+  {
+   "scope": "all",
+   "flag": "in_surge_slosh_area",
+   "yes": 4,
+   "no": 3,
+   "unrecorded": 67
+  },
+  {
+   "scope": "all",
+   "flag": "in_100_yr_floodplain",
+   "yes": 2,
+   "no": 1,
+   "unrecorded": 71
+  },
+  {
+   "scope": "evac",
+   "flag": "wheelchair_accessible",
+   "yes": 9,
+   "no": 2,
+   "unrecorded": 63
+  },
+  {
+   "scope": "evac",
+   "flag": "generator_onsite",
+   "yes": 5,
+   "no": 0,
+   "unrecorded": 69
+  },
+  {
+   "scope": "evac",
+   "flag": "self_sufficient_electricity",
+   "yes": 2,
+   "no": 0,
+   "unrecorded": 72
+  },
+  {
+   "scope": "evac",
+   "flag": "in_surge_slosh_area",
+   "yes": 4,
+   "no": 3,
+   "unrecorded": 67
+  },
+  {
+   "scope": "evac",
+   "flag": "in_100_yr_floodplain",
+   "yes": 2,
+   "no": 1,
+   "unrecorded": 71
+  }
+ ],
+ "access": {
+  "county": {
+   "tracts": 200,
+   "median_km_any": 1.9,
+   "median_km_wheelchair_yes": 11.8,
+   "people_over_10km_any": 3000,
+   "households_no_vehicle": 15000,
+   "households_no_vehicle_within_reach_any": 12000,
+   "households_no_vehicle_within_reach_wheelchair_yes": 1500,
+   "tracts_no_wheelchair_yes_within_reach": 180
+  },
+  "state": {
+   "tracts": 5000,
+   "median_km_any": 1.9,
+   "median_km_wheelchair_yes": 7.1,
+   "people_over_10km_any": 490000,
+   "households_no_vehicle": 480000,
+   "households_no_vehicle_within_reach_any": 384000,
+   "households_no_vehicle_within_reach_wheelchair_yes": 48000,
+   "tracts_no_wheelchair_yes_within_reach": 4500
+  }
+ },
+ "baseline": {
+  "county": {
+   "pct_no_vehicle": 5.0,
+   "pct_age_65_plus": 29.0,
+   "pct_disability": 14.0,
+   "pct_mobile_homes": 13.0,
+   "poverty_rate": 12.0,
+   "pct_mobility": 16.0
+  },
+  "state": {
+   "pct_no_vehicle": 6.0,
+   "pct_age_65_plus": 21.0,
+   "pct_disability": 13.6,
+   "pct_mobile_homes": 10.5,
+   "poverty_rate": 13.5,
+   "pct_mobility": 15.4
+  }
+ },
+ "care": {
+  "facilities": 20,
+  "certified_beds": 2100,
+  "far_from_generator": 5,
+  "certified_beds_far_from_generator": 600,
+  "threshold_km": 10.0
+ },
+ "power": {
+  "power_dependent_dme": 5480,
+  "is_censored": false,
+  "medical_capacity": 2000,
+  "scope": "county"
+ },
+ "freshness": "historical",
+ "sources": [
+  "fema_nss",
+  "acs",
+  "cdc_svi",
+  "cdc_places",
+  "fema_nri",
+  "cms",
+  "hhs_empower"
+ ]
+}
