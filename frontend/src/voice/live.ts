@@ -59,8 +59,15 @@ export class LiveVoice {
     this.h.onState(s);
   }
 
-  async connect(): Promise<void> {
+  /** mic=false connects for typed turns only (the agent still answers aloud). */
+  async connect(mic = true): Promise<void> {
     this.set("connecting");
+    if (mic) await this.openMic();
+    this.playCtx = new AudioContext({ sampleRate: 24000 });
+    await this.openSocket();
+  }
+
+  private async openMic(): Promise<void> {
     try {
       // Mic first, so a denied permission fails fast with a clear message.
       this.stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
@@ -98,8 +105,13 @@ export class LiveVoice {
       if (this.pending.length >= 1600) this.flush();
     };
     src.connect(this.node);
-    this.playCtx = new AudioContext({ sampleRate: 24000 });
+  }
 
+  get hasMic(): boolean {
+    return !!this.node;
+  }
+
+  private async openSocket(): Promise<void> {
     const sessionId = await createVoiceSession();
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     const base = CONFIG.agentUrl ? CONFIG.agentUrl.replace(/^http/, "ws") : `${proto}//${location.host}`;

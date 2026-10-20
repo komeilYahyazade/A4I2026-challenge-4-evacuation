@@ -297,7 +297,9 @@ async function voiceUpgrade(req, socket, head) {
       }, VOICE_MAX_MS);
       socket.pipe(upSocket);
       upSocket.pipe(socket);
+      // Server sockets are half-open by default, so a client hang-up is only an "end": treat it as the end.
       for (const s of [socket, upSocket]) {
+        s.on("end", done);
         s.on("close", done);
         s.on("error", done);
       }

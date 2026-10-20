@@ -62,6 +62,8 @@ export function VoiceBar() {
     const t = turn.current;
     const inT = (ev.inputTranscription || ev.input_transcription) as { text?: string } | undefined;
     const outT = (ev.outputTranscription || ev.output_transcription) as { text?: string } | undefined;
+    // Transcripts stream as partial:true pieces, then one partial:false event carrying the full text.
+    const final = ev.partial === false;
     if (inT?.text) {
       if (!t.userId) {
         t.n++;
@@ -69,7 +71,7 @@ export function VoiceBar() {
         t.userText = "";
         d({ type: "chatAdd", msg: { id: t.userId, role: "user", author: "voice", text: "", tools: [], groundingSources: [], toolSources: [] } });
       }
-      t.userText += inT.text;
+      t.userText = final ? inT.text : t.userText + inT.text;
       d({ type: "chatPatch", id: t.userId, patch: { text: `🎙 ${t.userText.trim()}` } });
     }
     const parts = ((ev.content as { parts?: Record<string, unknown>[] } | undefined)?.parts || []) as Record<string, unknown>[];
@@ -89,7 +91,7 @@ export function VoiceBar() {
     if (outT?.text) {
       ensureAgent();
       t.userId = null; // the user's turn is over once the agent answers
-      t.agentText += outT.text;
+      t.agentText = final ? outT.text : t.agentText + outT.text;
     }
     if (t.agentId) d({ type: "chatPatch", id: t.agentId, patch: { text: t.agentText.trim() || "…", toolSources: t.sources } });
     if (ev.turnComplete || ev.turn_complete) {
@@ -106,7 +108,21 @@ export function VoiceBar() {
     }
   };
 
-  const start = async (andLive: boolean) => {
+  const [typed, setTyped] = useState("");
+  const sendTyped = async () => {
+    const text = typed.trim();
+    if (!text) return;
+    setTyped("");
+    if (!voice.current) {
+      await start(false, false);
+      if (!voice.current) return;
+    }
+    turn.current.userId = null;
+    d({ type: "chatAdd", msg: { id: `vt${Date.now()}`, role: "user", author: "voice", text: `⌨ ${text}`, tools: [], groundingSources: [], toolSources: [] } });
+    voice.current.sendText(text);
+  };
+
+  const start = async (andLive: boolean, mic = true) => {
     setErr(null);
     const v = new LiveVoice({
       onState: setState,
@@ -121,7 +137,7 @@ export function VoiceBar() {
     });
     voice.current = v;
     try {
-      await v.connect();
+      await v.connect(mic);
       setStarted(Date.now());
       if (andLive) {
         setLive(true);
@@ -194,6 +210,18 @@ export function VoiceBar() {
           </button>
         )}
       </div>
+      <form
+        className="voice-type"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void sendTyped();
+        }}
+      >
+        <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="…or type, and hear the answer" aria-label="Type to the voice agent" />
+        <button className="btn btn-small" disabled={!typed.trim() || state === "connecting"}>
+          Speak it
+        </button>
+      </form>
       {err && <div className="voice-error small">{err}</div>}
       {!err && !started && <div className="small muted">Hold the mic to talk, or turn on Live. Answers are spoken and written here; sources stay on screen.</div>}
     </div>
