@@ -15,6 +15,12 @@ Public-demo limits, all set by the deploy script:
 - `BIGQUERY_MCP_ENABLED=false`; the script refuses to deploy with it set to true.
 - Access tiers come from the caller's ID token email (see contract/README.md "Access tiers"). `PUBLIC_CALLER_SA` overrides the public proxy's service account.
 
+Voice (Gemini Live):
+- The image ships two ADK apps, `agent` and `voice`; `/list-apps` returns `["agent","voice"]`.
+- `VOICE_ENABLED=1` and `VOICE_PUBLIC=0` by default. Run `VOICE_ENABLED=0 bash deploy/deploy_agent.sh` to turn voice off for everyone, or flip it with
+  `gcloud run services update readiness-agent --region us-central1 --update-env-vars VOICE_ENABLED=0`.
+- No new IAM is needed: roles/aiplatform.user is project-wide, and the us-central1 Live session works as readiness-agent@.
+
 Why it is built this way:
 - We use `gcloud`, not `adk deploy cloud_run`, so `GOOGLE_CLOUD_LOCATION` stays `global`, which is where Maps grounding works.
 - There is one instance with in-memory sessions, because ADK session events can carry Google Maps content and only `place_id` may be stored.

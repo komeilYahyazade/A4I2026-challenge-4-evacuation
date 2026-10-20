@@ -15,7 +15,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-CONTRACT_VERSION = "1.5"
+CONTRACT_VERSION = "1.6"
 SCHEMA_VERSION = 1
 
 ThreeState = Literal["YES", "NO", "UNRECORDED"]

@@ -1,4 +1,4 @@
-# System contract, v1.5 (FROZEN at v1.0 12:00 EDT; additive changes only)
+# System contract, v1.6 (FROZEN at v1.0 12:00 EDT; additive changes only)
 
 **Owner:** agent lane. To change anything, send `CONTRACT-CHANGE:`; the owner bumps the version and
 broadcasts `CONTRACT vX.Y published`. v1.0 froze at 12:00 EDT. From now on changes are additive only: new optional
@@ -103,6 +103,43 @@ Every draft and approval is appended to `readiness_ops.decision_log`, and `plan_
 
 The UI loads `/api/map`, `/api/allocate` and `/api/brief` (with `verify_top_n:0`) in parallel, then
 calls `/api/verify` for the shelters it checks live on camera (demo beat 1).
+
+
+### A3. Live voice (Gemini Live), v1.6, confirmed on readiness-agent-00011-5wz
+
+The voice app is ADK app `voice` (`voice/agent.py`, komeil-d2). It runs `gemini-3.8-live` in us-central1 (global gives close 1008) with the
+same FUNCTION_TOOLS as the text agent, no google_maps built-in, and no MCP. `verify_shelters` still grounds at `global` itself.
+
+- **Availability:** `GET /api/health` returns `voice` (true when the voice app is in the image and `VOICE_ENABLED=1`) and
+  `voice_public` (`VOICE_PUBLIC=1`; the default is 0). The UI shows the mic only when voice is true, and on the public site only when voice_public is also true.
+- **Session:** `POST /apps/voice/users/{userId}/sessions` with `{"state": {"county_fips": "12071"}}`. These are separate from chat (app `agent`) sessions.
+- **Socket:** `wss://<agent>/run_live?app_name=voice&user_id=<u>&session_id=<id>&modalities=AUDIO`
+  - `modalities` is a repeated query parameter, with default `["AUDIO"]`.
+  - Also accepted: `proactive_audio`, `enable_affective_dialog`, `enable_session_resumption`, `explicit_vad_signal`. Never send `save_live_blob=true`.
+- **Client to server:** one JSON text frame per `LiveRequest`.
+  - **Top-level keys are snake_case only:** `blob`, `content`, `close`, `activity_start`, `activity_end`,
+    `audio_stream_end`, `state_delta`. A camelCase or unknown top-level key is silently dropped (tested: `{"audioStreamEnd":true}` became an empty request).
+    Fields nested inside accept either casing; use `mime_type`.
+  - Audio: `{"blob": {"mime_type": "audio/pcm;rate=16000", "data": "<base64 PCM16 LE mono 16 kHz>"}}`, sent about every 100 ms. ADK runs VAD by default.
+  - Typed text: `{"content": {"role": "user", "parts": [{"text": "..."}]}}`
+  - End: `{"close": true}`
+- **Server to client:** text frames, each an ADK Event in camelCase (exclude_none).
+  - `content.parts[].inlineData {mimeType: "audio/pcm;rate=24000", data: <base64 PCM16 LE mono 24 kHz>}`
+  - `outputTranscription {text}`: incremental on `partial: true` events, then final on `partial: false`. `inputTranscription {text}` arrives when the user speaks.
+  - `content.parts[].functionCall {name, args}` and `functionResponse {name, response}`. The response is the usual payload with `payload_type`,
+    and allocate and rehearse are compact (`compact: true`, fetch `full`), so use the same dispatch as chat.
+  - `turnComplete: true`. One arrives after the tool round and another after the spoken answer; wait for audio before treating the turn as done.
+    `interrupted: true` means barge-in: stop playback and flush.
+  - Other keys: `author: "readiness_voice"`, `liveSessionId`, `usageMetadata`, and `groundingMetadata` (render it only if it has chunks).
+- **Close codes:**
+  - `1008 "Voice is turned off on the public demo"`: the caller is public by the same identity rule as HTTP, and VOICE_PUBLIC is not 1.
+  - `1008 "Voice is turned off"`: the VOICE_ENABLED=0 kill switch.
+  - `1002 "Session not found"`
+  - `1011 <reason up to 123 bytes>` for internal errors.
+  - The public proxy adds its own 4008 at 3 minutes.
+- **Measured:** "how many residents without a car can we not place?" took 20 s end to end: allocate_county (compact), then 96 audio frames,
+  then the spoken answer "5,589 ..." with both caveats.
+- **Capture:** `contract/fixtures/run_live.sample.jsonl`. Line 1 is a header with the client messages; 3 of 96 audio frames are kept, audio data is truncated, and Maps content is redacted.
 
 ## 3. Payloads
 
@@ -256,6 +293,7 @@ best_track[] {lat, lng, valid_at, wind_kt}   (what actually happened; NHC best t
 - Every JSON fixture must validate (`tests/test_contract.py`).
 
 ## Changelog
+- **v1.6 (14:45):** A3 live voice (/run_live, app voice), the voice gate, and voice and voice_public in /api/health. Revision readiness-agent-00011-5wz.
 - **v1.5 (12:45):** identity-based access tiers, public limits, MERGE for place_ids, health caller fields. Revision readiness-agent-00006-p92.
 - **v1.4 (12:20):** compact chat payloads for allocate_county and rehearse (compact, full, gaps_total, gap_counts, excluded_counts, reassigned_total).
 - **v1.3 (12:08):** plans routes (draft, approve, list) and decision_log; place_ids_stored; SUCCESSOR_AT_ADDRESS and NAME_SAYS_INACTIVE flags; in-memory sessions with max 1 instance. Serving on revision readiness-agent-00004-cmz.
