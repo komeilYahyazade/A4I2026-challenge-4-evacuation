@@ -1,0 +1,18 @@
+{
+  "shelter_id": "352718",
+  "checked_at": "2026-10-20T15:41:02Z",
+  "status": "renamed",
+  "maps_name": "Eastside Magnet High School",
+  "record_name": "Eastside High School",
+  "place_type": "high school",
+  "open_now": true,
+  "wheelchair": {"maps": "yes", "record": "unrecorded", "agreement": "record_blank"},
+  "drive": {"from_geo_id": "12071050100", "drive_minutes": 9, "drive_km": 4.0},
+  "summary": [
+    {"text": "Same address, now listed as Eastside Magnet High School.", "source_ids": ["src_1"], "freshness": "live"},
+    {"text": "Google Maps reports a wheelchair-accessible entrance.", "source_ids": ["src_1"], "freshness": "live"}
+  ],
+  "sources": [
+    {"id": "src_1", "provider": "Google Maps", "title": "Eastside Magnet High School", "uri": "https://maps.google.com/?cid=0000000000", "place_id": "ChIJ_example_1"}
+  ]
+}

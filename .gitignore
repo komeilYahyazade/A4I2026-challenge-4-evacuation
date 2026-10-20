@@ -24,3 +24,11 @@ Thumbs.db
 data/*.parquet
 data/*.csv
 data/*.csv.gz
+
+# ADK local storage
+.adk/
+
+# project-local Node.js (nodeenv)
+.node/
+web/node_modules/
+web/dist/

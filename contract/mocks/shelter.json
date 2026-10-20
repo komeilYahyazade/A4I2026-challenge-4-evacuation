@@ -1,0 +1,9 @@
+{
+  "shelter_id": "352718", "name": "Eastside High School", "address": "1200 Example Ave, Fort Myers, FL 33916",
+  "county_fips": "12071", "lat": 26.6391, "lon": -81.8412, "nearest_geo_id": "12071050100", "usage": "EVAC",
+  "evacuation_capacity": 1200, "post_impact_capacity": 600, "wheelchair_accessible": "unrecorded",
+  "generator_onsite": "yes", "in_surge_slosh_area": "no", "in_100_yr_floodplain": "unrecorded",
+  "is_medical": false, "place_id": null, "source": "fema_nss", "freshness": "historical",
+  "pet_accommodations_code": "NONE", "population_code": "GENERAL", "shelter_status_code": "CLOSED",
+  "incident_id": null, "last_verification": null
+}

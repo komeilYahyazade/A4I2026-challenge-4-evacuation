@@ -1,0 +1,38 @@
+{
+  "county_fips": "12071",
+  "center": {"lat": 26.57, "lon": -81.87},
+  "tracts": [
+    {
+      "geo_id": "12071050100", "lat": 26.6406, "lon": -81.8723, "total_pop": 4210,
+      "households_no_vehicle": 412, "pct_no_vehicle": 25.3, "pop_65_plus": 1180, "pct_age_65_plus": 28.0,
+      "pct_disability": 19.4, "mobile_homes": 310, "group_quarters_pop": 45, "need_score": 0.88,
+      "nearest_shelter_km": 1.9, "nearest_wheelchair_yes_km": 11.8
+    },
+    {
+      "geo_id": "12071060300", "lat": 26.6012, "lon": -81.8501, "total_pop": 3890,
+      "households_no_vehicle": 288, "pct_no_vehicle": 18.1, "pop_65_plus": 1402, "pct_age_65_plus": 36.0,
+      "pct_disability": 22.7, "mobile_homes": 640, "group_quarters_pop": 0, "need_score": 0.81,
+      "nearest_shelter_km": 2.6, "nearest_wheelchair_yes_km": 9.4
+    }
+  ],
+  "shelters": [
+    {
+      "shelter_id": "352718", "name": "Eastside High School", "address": "1200 Example Ave, Fort Myers, FL 33916",
+      "county_fips": "12071", "lat": 26.6391, "lon": -81.8412, "nearest_geo_id": "12071050100", "usage": "EVAC",
+      "evacuation_capacity": 1200, "post_impact_capacity": 600, "wheelchair_accessible": "unrecorded",
+      "generator_onsite": "yes", "in_surge_slosh_area": "no", "in_100_yr_floodplain": "unrecorded",
+      "is_medical": false, "place_id": null, "source": "fema_nss", "freshness": "historical"
+    },
+    {
+      "shelter_id": "352731", "name": "Example Community Center", "address": "45 Sample St, Fort Myers, FL 33901",
+      "county_fips": "12071", "lat": 26.6155, "lon": -81.8667, "nearest_geo_id": "12071060300", "usage": "EVAC",
+      "evacuation_capacity": null, "post_impact_capacity": null, "wheelchair_accessible": "yes",
+      "generator_onsite": "unrecorded", "in_surge_slosh_area": "yes", "in_100_yr_floodplain": "yes",
+      "is_medical": true, "place_id": null, "source": "fema_nss", "freshness": "historical"
+    }
+  ],
+  "care_facilities": [
+    {"ccn": "105678", "name": "Example Gardens Nursing Center", "lat": 26.6102, "lon": -81.8015, "certified_beds": 120, "nearest_generator_yes_km": 12.4}
+  ],
+  "power_dependence": {"county_fips": "12071", "power_dependent_dme": 5480, "is_censored": false, "scope": "county"}
+}

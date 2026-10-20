@@ -1,0 +1,13 @@
+{
+  "session_id": "ses_9c1d",
+  "reply": [
+    {"text": "Yes. Google Maps lists it as an active public high school, now named Eastside Magnet High School.", "source_ids": ["src_1"], "freshness": "live"},
+    {"text": "FEMA's record does not say whether it is wheelchair accessible. That field was never filled in.", "source_ids": [], "freshness": "historical"}
+  ],
+  "sources": [
+    {"id": "src_1", "provider": "Google Maps", "title": "Eastside Magnet High School", "uri": "https://maps.google.com/?cid=0000000000", "place_id": "ChIJ_example_1"}
+  ],
+  "highlight": {"tracts": [], "shelters": ["352718"], "care_facilities": []},
+  "tool_calls": [{"name": "verify_shelter", "duration_ms": 6400}],
+  "refused": false
+}

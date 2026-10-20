@@ -1,0 +1,133 @@
+{
+  "brief_id": "brf_01JB7X",
+  "status": "complete",
+  "progress": {"step": "complete", "message": "Done", "done": 12, "total": 12},
+  "error": null,
+  "brief": {
+    "county": {"county_fips": "12071", "name": "Lee County", "state": "FL"},
+    "track": "shelter_readiness",
+    "generated_at": "2026-10-20T15:42:10Z",
+    "model": "gemini-3.6-flash",
+    "headline": "Of 12 shelters serving the five least mobile tracts, 2 can be counted on for wheelchair users; 9 nobody has assessed.",
+    "assumptions": {
+      "reachable_km_no_vehicle": 3.0,
+      "transport_measure": "households_no_vehicle (ACS): owning no car, not lacking a ride",
+      "distance": "Straight line unless drive_minutes is shown",
+      "shelter_to_tract": "Nearest tract centroid by ST_DISTANCE",
+      "need_score": "Min-max normalised within FL: 0.35 households_no_vehicle + 0.20 pop_65_plus + 0.20 pct_disability + 0.15 mobile_homes + 0.10 group_quarters_pop"
+    },
+    "who_cannot_leave": [
+      {
+        "rank": 1, "kind": "tract", "id": "12071050100", "label": "Tract 501",
+        "lat": 26.6406, "lon": -81.8723, "people": 4210,
+        "drivers": [
+          {"metric": "households_no_vehicle", "value": 412, "unit": "households", "source": "acs"},
+          {"metric": "pct_age_65_plus", "value": 28.0, "unit": "%", "source": "cdc_svi"}
+        ],
+        "reason": "412 households own no car, and the nearest shelter recorded as wheelchair accessible is 11.8 km away."
+      },
+      {
+        "rank": 2, "kind": "care_facility", "id": "105678", "label": "Example Gardens Nursing Center",
+        "lat": 26.6102, "lon": -81.8015, "people": 120,
+        "drivers": [{"metric": "certified_beds", "value": 120, "unit": "beds", "source": "cms"}],
+        "reason": "120 certified beds and no shelter with a recorded generator within 10 km."
+      }
+    ],
+    "power_dependence": {"power_dependent_dme": 5480, "is_censored": false, "caveat": "County total: how many people, not where they live."},
+    "destinations": [
+      {
+        "shelter": {
+          "shelter_id": "352718", "name": "Eastside High School", "address": "1200 Example Ave, Fort Myers, FL 33916",
+          "county_fips": "12071", "lat": 26.6391, "lon": -81.8412, "nearest_geo_id": "12071050100", "usage": "EVAC",
+          "evacuation_capacity": 1200, "post_impact_capacity": 600, "wheelchair_accessible": "unrecorded",
+          "generator_onsite": "yes", "in_surge_slosh_area": "no", "in_100_yr_floodplain": "unrecorded",
+          "is_medical": false, "place_id": "ChIJ_example_1", "source": "fema_nss", "freshness": "historical"
+        },
+        "serves": ["12071050100"],
+        "straight_line_km": 3.1,
+        "verification": {
+          "shelter_id": "352718",
+          "checked_at": "2026-10-20T15:41:02Z",
+          "status": "renamed",
+          "maps_name": "Eastside Magnet High School",
+          "record_name": "Eastside High School",
+          "place_type": "high school",
+          "open_now": true,
+          "wheelchair": {"maps": "yes", "record": "unrecorded", "agreement": "record_blank"},
+          "drive": {"from_geo_id": "12071050100", "drive_minutes": 9, "drive_km": 4.0},
+          "summary": [
+            {"text": "Same address, now listed as Eastside Magnet High School.", "source_ids": ["src_1"], "freshness": "live"},
+            {"text": "Google Maps reports a wheelchair-accessible entrance.", "source_ids": ["src_1"], "freshness": "live"}
+          ],
+          "sources": [
+            {"id": "src_1", "provider": "Google Maps", "title": "Eastside Magnet High School", "uri": "https://maps.google.com/?cid=0000000000", "place_id": "ChIJ_example_1"}
+          ]
+        },
+        "verdict": "verify_before_season",
+        "verdict_reason": [
+          {"text": "Still an active school under a new name.", "source_ids": ["src_1"], "freshness": "live"},
+          {"text": "FEMA never recorded wheelchair access, so confirm the entrance on site.", "source_ids": [], "freshness": "historical"}
+        ]
+      },
+      {
+        "shelter": {
+          "shelter_id": "352731", "name": "Example Community Center", "address": "45 Sample St, Fort Myers, FL 33901",
+          "county_fips": "12071", "lat": 26.6155, "lon": -81.8667, "nearest_geo_id": "12071060300", "usage": "EVAC",
+          "evacuation_capacity": null, "post_impact_capacity": null, "wheelchair_accessible": "yes",
+          "generator_onsite": "unrecorded", "in_surge_slosh_area": "yes", "in_100_yr_floodplain": "yes",
+          "is_medical": true, "place_id": null, "source": "fema_nss", "freshness": "historical"
+        },
+        "serves": ["12071060300"],
+        "straight_line_km": 1.4,
+        "verification": {
+          "shelter_id": "352731",
+          "checked_at": "2026-10-20T15:41:05Z",
+          "status": "closed",
+          "maps_name": "Example Community Center",
+          "record_name": "Example Community Center",
+          "place_type": "community center",
+          "open_now": null,
+          "wheelchair": {"maps": "no_answer", "record": "yes", "agreement": "maps_blank"},
+          "drive": null,
+          "summary": [
+            {"text": "Google Maps lists this community center as permanently closed.", "source_ids": ["src_2"], "freshness": "live"}
+          ],
+          "sources": [
+            {"id": "src_2", "provider": "Google Maps", "title": "Example Community Center", "uri": "https://maps.google.com/?cid=0000000001", "place_id": "ChIJ_example_2"}
+          ]
+        },
+        "verdict": "do_not_rely",
+        "verdict_reason": [
+          {"text": "Permanently closed on Google Maps; dropped and the next candidate verified.", "source_ids": ["src_2"], "freshness": "live"},
+          {"text": "The FEMA record also places it in the surge zone.", "source_ids": [], "freshness": "historical"}
+        ]
+      }
+    ],
+    "fixes": [
+      {
+        "priority": 1,
+        "category": "no_accessible_destination",
+        "title": "No shelter recorded as wheelchair accessible within 3 km of tracts 501 and 603",
+        "recommendation": "Assess Eastside High School's entrance before September 1. It is the closest shelter to both tracts and its record is blank.",
+        "affected": {"tracts": ["12071050100", "12071060300"], "shelters": ["352718"], "care_facilities": []},
+        "source_ids": ["src_1"]
+      },
+      {
+        "priority": 2,
+        "category": "record_mismatch",
+        "title": "Example Community Center is closed but still on the FEMA list",
+        "recommendation": "Remove it from the county shelter plan and update the FEMA record.",
+        "affected": {"tracts": ["12071060300"], "shelters": ["352731"], "care_facilities": []},
+        "source_ids": ["src_2"]
+      }
+    ],
+    "unknowns": [
+      {"topic": "Wheelchair access", "count": 63, "of": 74, "unit": "shelters", "why": "FEMA's field is blank: nobody recorded it, which is not the same as no.", "how_to_close": "Call or visit each site, or run the assessment agent."},
+      {"topic": "Where power-dependent residents live", "count": 5480, "of": null, "unit": "people", "why": "emPOWER publishes county totals only.", "how_to_close": "No public source. Ask the county health department."}
+    ],
+    "sources": [
+      {"id": "src_1", "provider": "Google Maps", "title": "Eastside Magnet High School", "uri": "https://maps.google.com/?cid=0000000000", "place_id": "ChIJ_example_1"},
+      {"id": "src_2", "provider": "Google Maps", "title": "Example Community Center", "uri": "https://maps.google.com/?cid=0000000001", "place_id": "ChIJ_example_2"}
+    ]
+  }
+}
