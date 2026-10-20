@@ -317,7 +317,8 @@ async def verify_shelter(shelter_id: str, tool_context: ToolContext, from_geo_id
 
     Args:
         shelter_id: FEMA shelter_id of the building to check.
-        from_geo_id: optional 11-digit census tract id to route from.
+        from_geo_id: optional 11-digit census tract id to route from, or "ccn:<CCN>" to route
+            from a nursing home.
         include_route: ask Google Maps routing for a drive time (only with from_geo_id).
 
     Returns:

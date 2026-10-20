@@ -11,7 +11,7 @@ from readiness_agent import config
 from readiness_agent.tools import facts
 
 DROPPED = ("closed", "not_found")
-CATEGORY_ORDER = ("no_accessible_destination", "generator_gap", "record_mismatch",
+CATEGORY_ORDER = ("no_accessible_destination", "seat_gap", "generator_gap", "record_mismatch",
                   "shelter_in_surge_zone", "unassessed_access", "medical_needs_gap")
 
 
@@ -27,7 +27,8 @@ def compute_gaps(f: dict, reachable_km: float = config.REACHABLE_KM_NO_VEHICLE,
                  generator_km: float = config.GENERATOR_GAP_KM) -> list[dict]:
     verifs = f.get("verifications", {})
     tracts = (_first(f.get("tracts")) or {}).get("tracts", [])
-    candidates = {k: v for k, v in f.get("candidates", {}).items() if not k.startswith("county:")}
+    every = {k: v for k, v in f.get("candidates", {}).items() if not k.startswith("county:")}
+    candidates = {k: v for k, v in every.items() if not k.startswith("ccn:")}  # searches from a tract
     gaps: list[dict] = []
 
     # 1. no_accessible_destination: a top-need tract with no recorded-yes shelter within reach.
@@ -57,19 +58,24 @@ def compute_gaps(f: dict, reachable_km: float = config.REACHABLE_KM_NO_VEHICLE,
 
     # 2. unassessed_access: candidate shelters within reach, unrecorded, and Maps had no answer
     #    (or was never asked).
-    seen: dict[str, dict] = {}
-    for geo, cand in candidates.items():
+    seen: dict[str, dict] = {}  # serves holds tract ids and "ccn:<id>" nursing-home origins
+    for origin, cand in every.items():
         for s in cand["shelters"]:
             if s["within_reach"]:
-                seen.setdefault(s["shelter_id"], {**s, "serves": set()})["serves"].add(geo)
+                seen.setdefault(s["shelter_id"], {**s, "serves": set()})["serves"].add(origin)
+
+    def split(origins):
+        origins = list(origins)
+        return ([o for o in origins if not o.startswith("ccn:")], [o[4:] for o in origins if o.startswith("ccn:")])
     unassessed = [s for sid, s in seen.items() if s["wheelchair_accessible"] == "unrecorded"
                   and (verifs.get(sid) or {}).get("wheelchair", {}).get("maps", "no_answer") == "no_answer"
                   and verifs.get(sid, {}).get("status") not in DROPPED]
     if unassessed:
         checked = [s for s in unassessed if s["shelter_id"] in verifs]
+        tr, cf = split(g for s in unassessed for g in s["serves"])
         gaps.append({
             "category": "unassessed_access", "subtype": None,
-            "affected": _affected([g for s in unassessed for g in s["serves"]], [s["shelter_id"] for s in unassessed]),
+            "affected": _affected(tr, [s["shelter_id"] for s in unassessed], cf),
             "metrics": {"shelters": len(unassessed), "checked_on_maps_no_answer": len(checked),
                         "not_checked_on_maps": len(unassessed) - len(checked)},
         })
@@ -88,9 +94,10 @@ def compute_gaps(f: dict, reachable_km: float = config.REACHABLE_KM_NO_VEHICLE,
     # 4. shelter_in_surge_zone: candidate shelters recorded inside the surge zone or 100-yr floodplain.
     surge = [s for s in seen.values() if s["in_surge_slosh_area"] == "yes" or s["in_100_yr_floodplain"] == "yes"]
     if surge:
+        tr, cf = split(g for s in surge for g in s["serves"])
         gaps.append({
             "category": "shelter_in_surge_zone", "subtype": None,
-            "affected": _affected([g for s in surge for g in s["serves"]], [s["shelter_id"] for s in surge]),
+            "affected": _affected(tr, [s["shelter_id"] for s in surge], cf),
             "metrics": {"shelters": len(surge), "evac_shelters": sum(1 for s in surge if s["usage"] == "EVAC"),
                         "in_surge_slosh_area": sum(1 for s in surge if s["in_surge_slosh_area"] == "yes"),
                         "in_100_yr_floodplain": sum(1 for s in surge if s["in_100_yr_floodplain"] == "yes")},
@@ -104,9 +111,10 @@ def compute_gaps(f: dict, reachable_km: float = config.REACHABLE_KM_NO_VEHICLE,
         if v["wheelchair"]["agreement"] == "disagree":
             reasons.append("wheelchair_disagree")
         if reasons:
+            tr, cf = split(sorted(seen.get(sid, {}).get("serves", ())))
             gaps.append({
                 "category": "record_mismatch", "subtype": ",".join(reasons),
-                "affected": _affected(sorted(seen.get(sid, {}).get("serves", ())), [sid]),
+                "affected": _affected(tr, [sid], cf),
                 "metrics": {"status": v["status"], "record_name": v["record_name"], "maps_name": v.get("maps_name"),
                             "wheelchair_record": v["wheelchair"]["record"], "wheelchair_maps": v["wheelchair"]["maps"]},
             })
@@ -124,6 +132,21 @@ def compute_gaps(f: dict, reachable_km: float = config.REACHABLE_KM_NO_VEHICLE,
                             "medical_shelters": power.get("medical_shelters"), "medical_capacity": cap,
                             "people_per_medical_space": ratio},
             })
+
+    # 7. seat_gap: the capacity plan (allocate_seats) leaves people without a seat within reach.
+    alloc = _first(f.get("allocation"))
+    if alloc and alloc["totals"]["unassigned_persons"] > 0:
+        best = (alloc.get("site_options") or [None])[0]
+        gaps.append({
+            "category": "seat_gap", "subtype": None,
+            "affected": _affected([u["geo_id"] for u in alloc["unassigned"]]),
+            "metrics": {"unassigned_persons": alloc["totals"]["unassigned_persons"],
+                        "demand_persons": alloc["totals"]["demand_persons"],
+                        "unassigned_tracts": alloc.get("unassigned_tracts", len(alloc["unassigned"])),
+                        "max_km": alloc["max_km"],
+                        "best_site_tract": best["geo_id"] if best else None,
+                        "best_site_persons": best["persons_covered"] if best else None},
+        })
 
     gaps.sort(key=lambda g: CATEGORY_ORDER.index(g["category"]))
     return gaps

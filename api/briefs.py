@@ -39,6 +39,7 @@ STEP_FOR_TOOL = {
     "rank_vulnerable_tracts": ("rank_tracts", "Ranking who cannot leave"),
     "list_care_facilities": ("rank_tracts", "Listing nursing homes"),
     "get_power_dependence": ("rank_tracts", "Reading power dependence"),
+    "allocate_seats": ("rank_tracts", "Matching people to shelter seats"),
     "find_candidate_shelters": ("find_shelters", "Finding candidate shelters"),
     "verify_shelter": ("verify_shelters", "Checking shelters on Google Maps"),
     "find_readiness_gaps": ("find_gaps", "Finding what to fix"),
@@ -289,6 +290,12 @@ def _fallback_fix(g: dict, county: dict) -> dict:
                "closed": "Remove it from the shelter plan and update the FEMA record.",
                "not_found": "Confirm on site whether the building still exists, then update the record."
                }.get(m["status"], "Confirm wheelchair access on site and correct the record.")
+    elif cat == "seat_gap":
+        title = (f"{_fmt(m['unassigned_persons'])} people without a car have no shelter seat within "
+                 f"{_fmt(m['max_km'])} km")
+        rec = ("Designate or retrofit a pre-landfall site near "
+               f"{brief_plan.tract_label(m['best_site_tract'])}: it alone would seat {_fmt(m['best_site_persons'])} of them."
+               if m.get("best_site_tract") else "Designate closer sites, or contract buses to shelters further out.")
     else:  # medical_needs_gap
         title = (f"{_fmt(m['power_dependent_dme'])} power-dependent residents and "
                  f"{_fmt(m['medical_capacity'])} recorded medical-needs shelter spaces")
@@ -309,7 +316,7 @@ def _headline(p: dict) -> str:
 
 
 def assemble_brief(f: dict, j: schemas.BriefJudgments | None, req: schemas.BriefRequest) -> dict:
-    p = brief_plan.plan(f)
+    p = brief_plan.plan(f, req.track)
     allowed = brief_plan.numbers_in_facts(f, p)
     smap = p["source_map"]
     allowed_src = set(p["allowed_source_ids"])

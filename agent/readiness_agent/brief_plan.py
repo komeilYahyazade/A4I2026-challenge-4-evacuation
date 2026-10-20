@@ -13,6 +13,35 @@ MAX_TRACTS = 5
 MAX_CARE = 3
 DROPPED = ("closed", "not_found")
 
+# What each track looks at. One source for the analyst, the writer and the brief (BriefPanel shows it).
+TRACKS = {
+    "shelter_readiness": {
+        "label": "Shelter readiness",
+        "question": "Can the shelters near the least mobile neighbourhoods really take wheelchair users?",
+        "who": "Tracts ranked by need score (no-car households, 65+, disability, mobile homes, group quarters), "
+               "then nursing homes with no generator shelter in reach.",
+        "checks": "The nearest pre-landfall shelters to each top tract, one building at a time on Google Maps.",
+        "tracts": 5, "care": 3,
+    },
+    "getting_people_out": {
+        "label": "Getting people out",
+        "question": "Who needs a ride, from where, to where, and how long is the run?",
+        "who": "Tracts ranked by households without a car; each marked walkable or pickup needed.",
+        "checks": "The nearest pre-landfall shelter for each top tract, with a Google Maps drive time from the tract, "
+                  "plus the seat plan: who is left without a seat within 15 km.",
+        "tracts": 6, "care": 0,
+    },
+    "medically_dependent": {
+        "label": "Medically dependent",
+        "question": "Where do nursing-home and power-dependent residents go, and is there a generator there?",
+        "who": "Nursing homes (beds, distance to a shelter with a recorded generator) and the county's "
+               "power-dependent total, then the top-need tracts.",
+        "checks": "Medical-needs and generator-recorded shelters nearest each nursing home, with a drive time from "
+                  "the facility.",
+        "tracts": 2, "care": 6,
+    },
+}
+
 # Fallback text (no numbers) for when the writer omits an unknown topic.
 UNKNOWN_DEFAULTS = {
     "Wheelchair access": ("FEMA's field is blank: nobody recorded it, which is not the same as no.",
@@ -42,9 +71,10 @@ def tract_label(geo_id: str) -> str:
     return f"Tract {base}" + (f".{suffix}" if suffix != "00" else "")
 
 
-def plan(f: dict) -> dict:
+def plan(f: dict, track: str = "shelter_readiness") -> dict:
+    spec = TRACKS.get(track, TRACKS["shelter_readiness"])
     county = _first(f.get("county")) or {}
-    tracts = ((_first(f.get("tracts")) or {}).get("tracts") or [])[:MAX_TRACTS]
+    tracts = ((_first(f.get("tracts")) or {}).get("tracts") or [])[:spec["tracts"]]
     care = (_first(f.get("care")) or {}).get("facilities", [])
     power = _first(f.get("power"))
     verifs = f.get("verifications", {})
@@ -52,16 +82,18 @@ def plan(f: dict) -> dict:
 
     far = [c for c in care if c["nearest_generator_yes_km"] is None
            or c["nearest_generator_yes_km"] > config.GENERATOR_GAP_KM]
-    care_pick = sorted(far or care, key=lambda c: -(c["certified_beds"] or 0))[:MAX_CARE]
+    care_pick = sorted(far or care, key=lambda c: -(c["certified_beds"] or 0))[:spec["care"]]
 
-    who = [{"kind": "tract", "id": t["geo_id"], "row": t} for t in tracts]
-    who += [{"kind": "care_facility", "id": c["ccn"], "row": c} for c in care_pick]
+    tract_who = [{"kind": "tract", "id": t["geo_id"], "row": t} for t in tracts]
+    care_who = [{"kind": "care_facility", "id": c["ccn"], "row": c} for c in care_pick]
+    who = care_who + tract_who if track == "medically_dependent" else tract_who + care_who
 
-    top_ids = [t["geo_id"] for t in tracts]
+    # A destination serves the tracts (or "ccn:<id>" nursing homes) whose search found it within reach.
+    origins = [t["geo_id"] for t in tracts] + [f"ccn:{c['ccn']}" for c in care_pick]
     destinations = []
     for sid, v in verifs.items():
         rows = [(geo, s) for geo, c in candidates.items() for s in c["shelters"] if s["shelter_id"] == sid]
-        serves = sorted({geo for geo, s in rows if s["within_reach"] and geo in top_ids})
+        serves = sorted({geo for geo, s in rows if s["within_reach"] and geo in origins})
         if not serves and (v.get("drive") or {}).get("from_geo_id"):
             serves = [v["drive"]["from_geo_id"]]
         kms = [s["straight_line_km"] for geo, s in rows if geo in serves and s["straight_line_km"] is not None]
@@ -94,7 +126,8 @@ def plan(f: dict) -> dict:
     smap = source_map(verifs)
     allowed_sources = sorted(set(smap.values()), key=lambda s: int(s[4:]))
     return {"county": county, "who": who, "destinations": destinations, "unknowns": unknowns,
-            "power": power, "source_map": smap, "allowed_source_ids": allowed_sources}
+            "power": power, "allocation": _first(f.get("allocation")), "track": track, "track_spec": spec,
+            "source_map": smap, "allowed_source_ids": allowed_sources}
 
 
 # Numbers that are vocabulary, not data: "age 65+", "100-year floodplain", "call 911".
@@ -139,10 +172,11 @@ def numbers_in_facts(f: dict, p: dict) -> set[float]:
     return out
 
 
-def writer_tasks(f: dict) -> dict:
+def writer_tasks(f: dict, track: str = "shelter_readiness") -> dict:
     """What the writer must judge, in the digest: exactly the ids the brief will carry."""
-    p = plan(f)
+    p = plan(f, track)
     return {
+        "track": track, "track_question": p["track_spec"]["question"],
         "reason_ids": [{"id": w["id"], "kind": w["kind"]} for w in p["who"]],
         "destination_ids": [d["shelter_id"] for d in p["destinations"]],
         "dropped_by_maps": [d["shelter_id"] for d in p["destinations"] if d["verification"]["status"] in DROPPED],

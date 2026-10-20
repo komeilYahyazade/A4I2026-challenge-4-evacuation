@@ -96,6 +96,10 @@ def digest(facts: dict[str, dict[str, Any]]) -> str:
                 "source_ids": [smap[(sid, s["id"])] for s in v.get("sources", [])],
             })
             for sid, v in facts["verifications"].items()}
+    if "allocation" in facts:
+        a = next(iter(facts["allocation"].values()))
+        out["seat_plan"] = {"totals": a["totals"], "max_km": a["max_km"], "unassigned_tracts": a.get("unassigned_tracts"),
+                            "site_options": [{k: o[k] for k in ("geo_id", "persons_covered")} for o in a["site_options"]]}
     if "gaps" in facts:
         out["gaps"] = next(iter(facts["gaps"].values()))["gaps"]
     return json.dumps(_ints(out), separators=(",", ":"), default=str)
